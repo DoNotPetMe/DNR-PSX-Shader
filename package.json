@@ -1,0 +1,23 @@
+{
+    "name": "com.donotpetme.dnr-psx-shader",
+    "displayName": "DNR PSX Shader",
+    "version": "1.0.0",
+    "unity": "2019.4",
+    "description": "PlayStation 1 style shader for VRChat avatars: vertex snapping, affine texture warping, color crush with ordered dithering, and PSX-style lighting. Includes a setup tool that converts your avatar's materials and builds an in-game Action Menu toggle to swap between the original and PSX look.",
+    "author": {
+        "name": "DoNotPetMe",
+        "url": "https://github.com/DoNotPetMe"
+    },
+    "license": "MIT",
+    "url": "https://github.com/DoNotPetMe/DNR-PSX-Shader",
+    "vpmDependencies": {
+        "com.vrchat.avatars": ">=3.5.0"
+    },
+    "keywords": [
+        "vrchat",
+        "shader",
+        "psx",
+        "retro",
+        "avatar"
+    ]
+}

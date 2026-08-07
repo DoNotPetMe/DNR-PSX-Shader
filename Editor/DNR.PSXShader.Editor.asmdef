@@ -1,0 +1,25 @@
+{
+    "name": "DNR.PSXShader.Editor",
+    "rootNamespace": "DNR.PSX.Editor",
+    "references": [
+        "VRC.SDKBase",
+        "VRC.SDK3A"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.vrchat.avatars",
+            "expression": "",
+            "define": "DNR_VRC_AVATARS"
+        }
+    ],
+    "noEngineReferences": false
+}
