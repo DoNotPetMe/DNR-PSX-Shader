@@ -51,7 +51,9 @@ Shader "DNR/PSX"
         [Toggle(_DNR_DOTCRAWL)] _DotCrawl ("Composite Dot Crawl", Float) = 0
         _DotCrawlIntensity ("Dot Crawl Intensity", Range(0, 1)) = 0.5
         _DotCrawlSize ("Dot Size (Pixels)", Range(1, 8)) = 3
-        _DotCrawlSpeed ("Crawl Speed", Range(0, 30)) = 8
+        _DotCrawlSpeed ("Auto Crawl Speed", Range(0, 30)) = 8
+        _DotCrawlViewMotion ("Viewer Motion", Range(0, 1)) = 0.5
+        _DotCrawlAvatarMotion ("Avatar Motion", Range(0, 1)) = 0.5
         _DotCrawlCoverage ("Edge Coverage", Range(0.05, 1)) = 0.35
 
         // ----------------------------------------------------------- lighting

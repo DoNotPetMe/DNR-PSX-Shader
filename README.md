@@ -104,7 +104,7 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
 | PSX Effects | Color Crush + Dither | Bits per channel (5 = authentic) and Bayer dither strength. |
 | Color & CRT | Color Grading | Hue shift / saturation / contrast on the final lit color. |
 | Color & CRT | CRT Scanlines | Scanline count (240 = authentic) and intensity. Keep subtle in VR. |
-| Color & CRT | Composite Dot Crawl | Crawling R/G/B edge beads: intensity, dot size, crawl speed, edge coverage. |
+| Color & CRT | Composite Dot Crawl | Crawling R/G/B edge beads: intensity, dot size, auto crawl speed, viewer-motion and avatar-motion response, edge coverage. Set Auto Crawl Speed to 0 for beads that only move when the viewer or avatar moves — each viewer sees the crawl driven by their own movement. |
 | Lighting | Lighting Mode | Vertex (classic PSX), Pixel (smooth), or Unlit. |
 | Lighting | Shading Strength | 1 = full diffuse shading/shadows, 0 = flat lighting that only picks up light color. |
 | Lighting | Minimum Brightness | Floor so the avatar never goes fully black in unlit worlds. |
@@ -154,6 +154,12 @@ Quest users will see your Quest version / fallback as usual.
 **The toggle does nothing in game.**
 Make sure you re-uploaded after building the toggle, and that you didn't rename the parameter in
 the FX controller without rebuilding. Rebuilding the toggle is always safe.
+
+**Force Point Filtering looks like it does nothing.**
+It only shows when texture pixels are larger than screen pixels — a low-res texture viewed up
+close. Typical 2K/4K avatar textures never magnify that far, so nothing visibly changes. For
+the chunky retro look on a high-res texture, use **Pixelate Texture** (which fakes a low-res
+texture first); point filtering then keeps those chunks hard-edged.
 
 **Emission / textures didn't carry over from my material.**
 The converter reads the common property names (`_MainTex`, `_Color`, `_EmissionMap`,

@@ -20,7 +20,7 @@ namespace DNR.PSX.Editor
             Transparent = 2
         }
 
-        public const string Version = "1.3.0";
+        public const string Version = "1.4.0";
 
         // ------------------------------------------------------------ state
         MaterialProperty _mode, _mainTex, _color, _cutoff, _vertexColor;
@@ -31,6 +31,7 @@ namespace DNR.PSX.Editor
         MaterialProperty _colorGrade, _hueShift, _saturation, _contrast;
         MaterialProperty _scanlines, _scanlineCount, _scanlineIntensity;
         MaterialProperty _dotCrawl, _dotCrawlIntensity, _dotCrawlSize, _dotCrawlSpeed, _dotCrawlCoverage;
+        MaterialProperty _dotCrawlViewMotion, _dotCrawlAvatarMotion;
         MaterialProperty _lighting, _shadeStrength, _minBrightness;
         MaterialProperty _cull;
 
@@ -107,6 +108,8 @@ namespace DNR.PSX.Editor
             _dotCrawlSize      = FindProperty("_DotCrawlSize", props);
             _dotCrawlSpeed     = FindProperty("_DotCrawlSpeed", props);
             _dotCrawlCoverage  = FindProperty("_DotCrawlCoverage", props);
+            _dotCrawlViewMotion   = FindProperty("_DotCrawlViewMotion", props);
+            _dotCrawlAvatarMotion = FindProperty("_DotCrawlAvatarMotion", props);
             _lighting        = FindProperty("_Lighting", props);
             _shadeStrength   = FindProperty("_ShadeStrength", props);
             _minBrightness   = FindProperty("_MinBrightness", props);
@@ -179,7 +182,10 @@ namespace DNR.PSX.Editor
                 editor.ShaderProperty(_pixelResolution, new GUIContent("Pixel Resolution",
                     "Virtual texture size in texels per UV tile."));
             editor.ShaderProperty(_pointFilter, new GUIContent("Force Point Filtering",
-                "Samples on texel centers for a crunchy point-filtered look, overriding the texture's import filter setting."));
+                "Makes texture pixels hard-edged instead of smoothly blended, without changing import settings. " +
+                "NOTE: only visible when texture pixels are bigger than screen pixels - i.e. low-res textures " +
+                "viewed up close. On typical 2K+ avatar textures you won't see a difference; use Pixelate " +
+                "Texture instead for the chunky look."));
             editor.ShaderProperty(_noMips, new GUIContent("Disable Mipmaps",
                 "Always samples the full-resolution texture for authentic distance shimmer, like hardware without mipmapping."));
 
@@ -228,8 +234,13 @@ namespace DNR.PSX.Editor
                     "How visible the colored beads are."));
                 editor.ShaderProperty(_dotCrawlSize, new GUIContent("Dot Size (Pixels)",
                     "Screen-pixel size of each bead. 2-4 reads like an old TV at typical VRChat resolutions."));
-                editor.ShaderProperty(_dotCrawlSpeed, new GUIContent("Crawl Speed",
-                    "How fast the beads crawl vertically along the edges."));
+                editor.ShaderProperty(_dotCrawlSpeed, new GUIContent("Auto Crawl Speed",
+                    "Constant crawl over time, even when nobody moves. Set to 0 so the beads only move with motion."));
+                editor.ShaderProperty(_dotCrawlViewMotion, new GUIContent("Viewer Motion",
+                    "How much the VIEWER's own movement (walking and looking around) drives the crawl. " +
+                    "Per-viewer: each person sees the beads move when they move."));
+                editor.ShaderProperty(_dotCrawlAvatarMotion, new GUIContent("Avatar Motion",
+                    "How much the avatar's own movement through the world drives the crawl."));
                 editor.ShaderProperty(_dotCrawlCoverage, new GUIContent("Edge Coverage",
                     "How far in from the silhouette the beads reach. Low values keep them on the outermost rim."));
             }

@@ -50,6 +50,8 @@ half _DotCrawlIntensity;
 half _DotCrawlSize;
 half _DotCrawlSpeed;
 half _DotCrawlCoverage;
+half _DotCrawlViewMotion;
+half _DotCrawlAvatarMotion;
 
 half _ShadeStrength;
 half _MinBrightness;
@@ -135,9 +137,25 @@ fixed3 DNRDotCrawl(fixed3 col, float2 pixelPos, float3 worldNormal, float3 world
     mask = max(mask, saturate(fwidth(luma) * 4.0) * 0.75);
 
     // Crawling bead pattern: checkerboard cells whose vertical phase advances
-    // over time, with columns alternating R/G/B like phosphor triads.
+    // with (a) time, (b) the viewer's own head/camera motion, and (c) the
+    // avatar's motion. On a real CRT the interference pattern shifted whenever
+    // the on-screen image changed, so the crawl is per-viewer: each person
+    // sees the dots move when *they* move or when the avatar moves.
     float cellSize = max(_DotCrawlSize, 1.0);
-    float2 crawlPos = float2(pixelPos.x, pixelPos.y + _Time.y * _DotCrawlSpeed * cellSize);
+    float crawlCells = _Time.y * _DotCrawlSpeed;
+
+    // Viewer motion: camera translation plus a rotation term from the camera
+    // forward axis, so both walking and looking around advance the phase.
+    float3 camFwd = -UNITY_MATRIX_V[2].xyz;
+    crawlCells += (_WorldSpaceCameraPos.x + _WorldSpaceCameraPos.y + _WorldSpaceCameraPos.z)
+                  * _DotCrawlViewMotion * 24.0;
+    crawlCells += (camFwd.x + 2.0 * camFwd.y + 3.0 * camFwd.z) * _DotCrawlViewMotion * 6.0;
+
+    // Avatar motion: the renderer's world position advances the phase.
+    float3 objPos = float3(unity_ObjectToWorld._m03, unity_ObjectToWorld._m13, unity_ObjectToWorld._m23);
+    crawlCells += (objPos.x + objPos.y + objPos.z) * _DotCrawlAvatarMotion * 24.0;
+
+    float2 crawlPos = float2(pixelPos.x, pixelPos.y + crawlCells * cellSize);
     int2 cell = (int2)floor(crawlPos / cellSize);
     float checker = (float)((cell.x + cell.y) & 1);
     uint channel = (uint)abs(cell.x) % 3u;

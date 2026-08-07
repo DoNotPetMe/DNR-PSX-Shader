@@ -4,6 +4,20 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-08-07
+
+### Added
+- **Dot crawl motion response**: two new sliders, "Viewer Motion" (the observer's own walking
+  and looking around advances the crawl - per-viewer, since the shader runs on each client)
+  and "Avatar Motion" (the avatar moving through the world advances it). With "Auto Crawl
+  Speed" at 0 the beads now freeze until someone moves, matching how the artifact behaved on
+  real CRTs where the interference only shifted when the on-screen image changed.
+
+### Changed
+- "Crawl Speed" renamed to "Auto Crawl Speed" to distinguish it from the motion-driven crawl.
+- Rewrote the "Force Point Filtering" tooltip and added a README FAQ entry explaining when
+  the effect is visible (magnified/low-res textures) and why high-res textures show no change.
+
 ## [1.3.0] - 2026-08-07
 
 ### Added
