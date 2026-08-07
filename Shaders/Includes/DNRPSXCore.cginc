@@ -46,6 +46,11 @@ half _Contrast;
 half _ScanlineCount;
 half _ScanlineIntensity;
 
+half _DotCrawlIntensity;
+half _DotCrawlSize;
+half _DotCrawlSpeed;
+half _DotCrawlCoverage;
+
 half _ShadeStrength;
 half _MinBrightness;
 
@@ -111,6 +116,37 @@ inline fixed4 DNRSampleTex(sampler2D tex, float2 uv)
     return tex2D(tex, uv);
 #endif
 }
+
+#if defined(_DNR_DOTCRAWL)
+// Composite-video "dot crawl": on a CRT fed a composite signal, luma and
+// chroma share one wire, so sharp edges leak small colored beads that crawl
+// vertically along silhouettes and high-contrast detail. Reproduced here as
+// screen-space R/G/B beads masked to glancing view angles and luma edges,
+// with a time-animated vertical phase.
+fixed3 DNRDotCrawl(fixed3 col, float2 pixelPos, float3 worldNormal, float3 worldPos)
+{
+    // Silhouette band: only the outermost glancing-angle rim lights up.
+    float3 viewDir = normalize(_WorldSpaceCameraPos - worldPos);
+    float rim = 1.0 - saturate(dot(normalize(worldNormal), viewDir));
+    float mask = smoothstep(1.0 - saturate(_DotCrawlCoverage), 1.0, rim);
+
+    // High-contrast texture edges leak a little too.
+    half luma = dot(col, half3(0.299, 0.587, 0.114));
+    mask = max(mask, saturate(fwidth(luma) * 4.0) * 0.75);
+
+    // Crawling bead pattern: checkerboard cells whose vertical phase advances
+    // over time, with columns alternating R/G/B like phosphor triads.
+    float cellSize = max(_DotCrawlSize, 1.0);
+    float2 crawlPos = float2(pixelPos.x, pixelPos.y + _Time.y * _DotCrawlSpeed * cellSize);
+    int2 cell = (int2)floor(crawlPos / cellSize);
+    float checker = (float)((cell.x + cell.y) & 1);
+    uint channel = (uint)abs(cell.x) % 3u;
+    fixed3 bead = fixed3(channel == 0u ? 1.0 : 0.0,
+                         channel == 1u ? 1.0 : 0.0,
+                         channel == 2u ? 1.0 : 0.0);
+    return lerp(col, bead, mask * checker * _DotCrawlIntensity);
+}
+#endif
 
 #if defined(_DNR_COLORGRADE)
 // Compact RGB<->HSV (Sam Hocevar's branchless formulation).
@@ -310,6 +346,10 @@ fixed4 DNRFrag(v2f i) : SV_Target
 
 #if defined(_DNR_POSTERIZE)
     col = DNRPosterize(col, i.pos.xy);
+#endif
+
+#if defined(_DNR_DOTCRAWL) && defined(UNITY_PASS_FORWARDBASE)
+    col = DNRDotCrawl(col, i.pos.xy, i.worldNormal, i.worldPos);
 #endif
 
 #if defined(_DNR_SCANLINES)

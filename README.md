@@ -23,6 +23,8 @@ your avatar's normal look and the PSX look.
 - **Full color grading** — hue shift, saturation, and contrast applied to the final lit color,
   before the color crush.
 - **CRT scanlines** — screen-space scanline overlay with adjustable count and intensity.
+- **Composite dot crawl** — the little crawling R/G/B beads old TVs showed along a character's
+  silhouette and sharp detail when consoles were hooked up over composite video.
 - **Three lighting modes** — *Vertex* (classic PSX per-vertex lighting), *Pixel* (smoother), and
   *Unlit*. All modes respect ambient probes, the main directional light with realtime shadows,
   additional realtime lights (ForwardAdd), and up to four per-vertex point lights.
@@ -96,6 +98,7 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
 | PSX Effects | Color Crush + Dither | Bits per channel (5 = authentic) and Bayer dither strength. |
 | Color & CRT | Color Grading | Hue shift / saturation / contrast on the final lit color. |
 | Color & CRT | CRT Scanlines | Scanline count (240 = authentic) and intensity. Keep subtle in VR. |
+| Color & CRT | Composite Dot Crawl | Crawling R/G/B edge beads: intensity, dot size, crawl speed, edge coverage. |
 | Lighting | Lighting Mode | Vertex (classic PSX), Pixel (smooth), or Unlit. |
 | Lighting | Shading Strength | 1 = full diffuse shading/shadows, 0 = flat lighting that only picks up light color. |
 | Lighting | Minimum Brightness | Floor so the avatar never goes fully black in unlit worlds. |

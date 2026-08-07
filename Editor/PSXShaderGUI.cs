@@ -20,7 +20,7 @@ namespace DNR.PSX.Editor
             Transparent = 2
         }
 
-        public const string Version = "1.1.0";
+        public const string Version = "1.2.0";
 
         // ------------------------------------------------------------ state
         MaterialProperty _mode, _mainTex, _color, _cutoff, _vertexColor;
@@ -30,6 +30,7 @@ namespace DNR.PSX.Editor
         MaterialProperty _posterize, _colorBits, _ditherStrength;
         MaterialProperty _colorGrade, _hueShift, _saturation, _contrast;
         MaterialProperty _scanlines, _scanlineCount, _scanlineIntensity;
+        MaterialProperty _dotCrawl, _dotCrawlIntensity, _dotCrawlSize, _dotCrawlSpeed, _dotCrawlCoverage;
         MaterialProperty _lighting, _shadeStrength, _minBrightness;
         MaterialProperty _cull;
 
@@ -101,6 +102,11 @@ namespace DNR.PSX.Editor
             _scanlines       = FindProperty("_Scanlines", props);
             _scanlineCount   = FindProperty("_ScanlineCount", props);
             _scanlineIntensity = FindProperty("_ScanlineIntensity", props);
+            _dotCrawl          = FindProperty("_DotCrawl", props);
+            _dotCrawlIntensity = FindProperty("_DotCrawlIntensity", props);
+            _dotCrawlSize      = FindProperty("_DotCrawlSize", props);
+            _dotCrawlSpeed     = FindProperty("_DotCrawlSpeed", props);
+            _dotCrawlCoverage  = FindProperty("_DotCrawlCoverage", props);
             _lighting        = FindProperty("_Lighting", props);
             _shadeStrength   = FindProperty("_ShadeStrength", props);
             _minBrightness   = FindProperty("_MinBrightness", props);
@@ -211,6 +217,22 @@ namespace DNR.PSX.Editor
                     "Number of scanlines over the screen height. 240 matches the PS1's typical output."));
                 editor.ShaderProperty(_scanlineIntensity, "Scanline Intensity");
             }
+
+            EditorGUILayout.Space(4);
+            editor.ShaderProperty(_dotCrawl, new GUIContent("Composite Dot Crawl",
+                "Small crawling R/G/B beads along silhouette edges and high-contrast detail, like a console " +
+                "hooked to a CRT over composite video."));
+            if (_dotCrawl.floatValue > 0.5f)
+            {
+                editor.ShaderProperty(_dotCrawlIntensity, new GUIContent("Intensity",
+                    "How visible the colored beads are."));
+                editor.ShaderProperty(_dotCrawlSize, new GUIContent("Dot Size (Pixels)",
+                    "Screen-pixel size of each bead. 2-4 reads like an old TV at typical VRChat resolutions."));
+                editor.ShaderProperty(_dotCrawlSpeed, new GUIContent("Crawl Speed",
+                    "How fast the beads crawl vertically along the edges."));
+                editor.ShaderProperty(_dotCrawlCoverage, new GUIContent("Edge Coverage",
+                    "How far in from the silhouette the beads reach. Low values keep them on the outermost rim."));
+            }
             EditorGUI.indentLevel--;
         }
 
@@ -312,6 +334,7 @@ namespace DNR.PSX.Editor
             SetKeyword(mat, "_DNR_NOMIPS", mat.GetFloat("_NoMips") > 0.5f);
             SetKeyword(mat, "_DNR_COLORGRADE", mat.GetFloat("_ColorGrade") > 0.5f);
             SetKeyword(mat, "_DNR_SCANLINES", mat.GetFloat("_Scanlines") > 0.5f);
+            SetKeyword(mat, "_DNR_DOTCRAWL", mat.GetFloat("_DotCrawl") > 0.5f);
 
             int lighting = Mathf.RoundToInt(mat.GetFloat("_Lighting"));
             SetKeyword(mat, "_LIGHTING_VERTEX", lighting == 0);

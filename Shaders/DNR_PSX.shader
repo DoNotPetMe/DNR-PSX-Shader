@@ -48,6 +48,12 @@ Shader "DNR/PSX"
         _ScanlineCount ("Scanline Count", Range(50, 480)) = 240
         _ScanlineIntensity ("Scanline Intensity", Range(0, 1)) = 0.25
 
+        [Toggle(_DNR_DOTCRAWL)] _DotCrawl ("Composite Dot Crawl", Float) = 0
+        _DotCrawlIntensity ("Dot Crawl Intensity", Range(0, 1)) = 0.5
+        _DotCrawlSize ("Dot Size (Pixels)", Range(1, 8)) = 3
+        _DotCrawlSpeed ("Crawl Speed", Range(0, 30)) = 8
+        _DotCrawlCoverage ("Edge Coverage", Range(0.05, 1)) = 0.35
+
         // ----------------------------------------------------------- lighting
         [KeywordEnum(Vertex, Pixel, Unlit)] _Lighting ("Lighting Mode", Float) = 0
         _ShadeStrength ("Shading Strength", Range(0, 1)) = 1
@@ -101,6 +107,7 @@ Shader "DNR/PSX"
             #pragma shader_feature_local _DNR_NOMIPS
             #pragma shader_feature_local _DNR_COLORGRADE
             #pragma shader_feature_local _DNR_SCANLINES
+            #pragma shader_feature_local _DNR_DOTCRAWL
             #pragma shader_feature_local _ALPHATEST_ON
             #pragma shader_feature_local _ALPHABLEND_ON
 
@@ -110,6 +117,7 @@ Shader "DNR/PSX"
 
         // -------------------------------------------------------------------
         // Additive pass: extra realtime point / spot / directional lights
+        // (dot crawl stays base-pass only so extra lights don't double it)
         // -------------------------------------------------------------------
         Pass
         {

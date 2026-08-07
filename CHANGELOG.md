@@ -4,6 +4,15 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-07
+
+### Added
+- **Composite dot crawl**: screen-space R/G/B beads that cling to silhouette edges (glancing
+  view angles) and high-contrast texture detail, crawling vertically over time - recreating
+  the composite-video artifact old CRT TVs showed on PS1/PS2 characters. Controls for
+  intensity, dot size, crawl speed, and edge coverage. Base pass only, so additional
+  realtime lights never double the effect.
+
 ## [1.1.0] - 2026-08-07
 
 ### Added
