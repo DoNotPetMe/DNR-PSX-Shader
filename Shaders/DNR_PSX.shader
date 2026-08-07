@@ -31,10 +31,22 @@ Shader "DNR/PSX"
 
         [Toggle(_DNR_PIXELATE)] _Pixelate ("Pixelate Texture", Float) = 0
         _PixelResolution ("Pixel Resolution", Range(16, 1024)) = 256
+        [Toggle] _PointFilter ("Force Point Filtering", Float) = 0
+        [Toggle(_DNR_NOMIPS)] _NoMips ("Disable Mipmaps", Float) = 0
 
         [Toggle(_DNR_POSTERIZE)] _Posterize ("Color Crush + Dither", Float) = 1
         [IntRange] _ColorBits ("Bits Per Channel", Range(3, 8)) = 5
         _DitherStrength ("Dither Strength", Range(0, 1)) = 1
+
+        // -------------------------------------------------------- color / crt
+        [Toggle(_DNR_COLORGRADE)] _ColorGrade ("Enable Color Grading", Float) = 0
+        _HueShift ("Hue Shift", Range(-180, 180)) = 0
+        _Saturation ("Saturation", Range(0, 2)) = 1
+        _Contrast ("Contrast", Range(0, 2)) = 1
+
+        [Toggle(_DNR_SCANLINES)] _Scanlines ("CRT Scanlines", Float) = 0
+        _ScanlineCount ("Scanline Count", Range(50, 480)) = 240
+        _ScanlineIntensity ("Scanline Intensity", Range(0, 1)) = 0.25
 
         // ----------------------------------------------------------- lighting
         [KeywordEnum(Vertex, Pixel, Unlit)] _Lighting ("Lighting Mode", Float) = 0
@@ -86,6 +98,9 @@ Shader "DNR/PSX"
             #pragma shader_feature_local _DNR_PIXELATE
             #pragma shader_feature_local _DNR_POSTERIZE
             #pragma shader_feature_local _DNR_VERTEXCOLOR
+            #pragma shader_feature_local _DNR_NOMIPS
+            #pragma shader_feature_local _DNR_COLORGRADE
+            #pragma shader_feature_local _DNR_SCANLINES
             #pragma shader_feature_local _ALPHATEST_ON
             #pragma shader_feature_local _ALPHABLEND_ON
 
@@ -116,6 +131,9 @@ Shader "DNR/PSX"
             #pragma shader_feature_local _DNR_PIXELATE
             #pragma shader_feature_local _DNR_POSTERIZE
             #pragma shader_feature_local _DNR_VERTEXCOLOR
+            #pragma shader_feature_local _DNR_NOMIPS
+            #pragma shader_feature_local _DNR_COLORGRADE
+            #pragma shader_feature_local _DNR_SCANLINES
             #pragma shader_feature_local _ALPHATEST_ON
             #pragma shader_feature_local _ALPHABLEND_ON
 

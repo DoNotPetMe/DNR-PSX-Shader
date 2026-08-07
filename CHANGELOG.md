@@ -4,6 +4,18 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-07
+
+### Added
+- **Force Point Filtering**: texel-center sampling that overrides the texture's import filter
+  setting (applies to albedo and emission independently, using each texture's own texel size).
+- **Disable Mipmaps**: full-resolution sampling at all distances for authentic PS1 shimmer.
+- **Color grading**: hue shift, saturation, and contrast on the final lit color, applied
+  before the color crush so the graded result still dithers correctly.
+- **CRT scanlines**: screen-space scanline overlay with adjustable count and intensity,
+  applied after posterization (simulating the display, not the console output).
+- New "Color & CRT" section in the material inspector; shared version constant.
+
 ## [1.0.0] - 2026-08-07
 
 ### Added

@@ -20,17 +20,22 @@ namespace DNR.PSX.Editor
             Transparent = 2
         }
 
+        public const string Version = "1.1.0";
+
         // ------------------------------------------------------------ state
         MaterialProperty _mode, _mainTex, _color, _cutoff, _vertexColor;
         MaterialProperty _emissionEnabled, _emissionMap, _emissionColor;
         MaterialProperty _snapStrength, _snapResolution, _affineStrength;
-        MaterialProperty _pixelate, _pixelResolution;
+        MaterialProperty _pixelate, _pixelResolution, _pointFilter, _noMips;
         MaterialProperty _posterize, _colorBits, _ditherStrength;
+        MaterialProperty _colorGrade, _hueShift, _saturation, _contrast;
+        MaterialProperty _scanlines, _scanlineCount, _scanlineIntensity;
         MaterialProperty _lighting, _shadeStrength, _minBrightness;
         MaterialProperty _cull;
 
         static bool foldSurface = true;
         static bool foldPSX = true;
+        static bool foldColorCRT = true;
         static bool foldLighting = true;
         static bool foldAdvanced;
 
@@ -56,6 +61,10 @@ namespace DNR.PSX.Editor
             if (foldPSX)
                 DrawPSXEffects(editor);
 
+            foldColorCRT = Foldout(foldColorCRT, "Color & CRT");
+            if (foldColorCRT)
+                DrawColorCRT(editor);
+
             foldLighting = Foldout(foldLighting, "Lighting");
             if (foldLighting)
                 DrawLighting(editor);
@@ -80,9 +89,18 @@ namespace DNR.PSX.Editor
             _affineStrength  = FindProperty("_AffineStrength", props);
             _pixelate        = FindProperty("_Pixelate", props);
             _pixelResolution = FindProperty("_PixelResolution", props);
+            _pointFilter     = FindProperty("_PointFilter", props);
+            _noMips          = FindProperty("_NoMips", props);
             _posterize       = FindProperty("_Posterize", props);
             _colorBits       = FindProperty("_ColorBits", props);
             _ditherStrength  = FindProperty("_DitherStrength", props);
+            _colorGrade      = FindProperty("_ColorGrade", props);
+            _hueShift        = FindProperty("_HueShift", props);
+            _saturation      = FindProperty("_Saturation", props);
+            _contrast        = FindProperty("_Contrast", props);
+            _scanlines       = FindProperty("_Scanlines", props);
+            _scanlineCount   = FindProperty("_ScanlineCount", props);
+            _scanlineIntensity = FindProperty("_ScanlineIntensity", props);
             _lighting        = FindProperty("_Lighting", props);
             _shadeStrength   = FindProperty("_ShadeStrength", props);
             _minBrightness   = FindProperty("_MinBrightness", props);
@@ -96,7 +114,7 @@ namespace DNR.PSX.Editor
             {
                 GUILayout.Label("DNR PSX Shader", EditorStyles.boldLabel);
                 GUILayout.FlexibleSpace();
-                GUILayout.Label("v1.0.0", EditorStyles.miniLabel);
+                GUILayout.Label("v" + Version, EditorStyles.miniLabel);
             }
             EditorGUILayout.Space(2);
         }
@@ -154,6 +172,10 @@ namespace DNR.PSX.Editor
             if (_pixelate.floatValue > 0.5f)
                 editor.ShaderProperty(_pixelResolution, new GUIContent("Pixel Resolution",
                     "Virtual texture size in texels per UV tile."));
+            editor.ShaderProperty(_pointFilter, new GUIContent("Force Point Filtering",
+                "Samples on texel centers for a crunchy point-filtered look, overriding the texture's import filter setting."));
+            editor.ShaderProperty(_noMips, new GUIContent("Disable Mipmaps",
+                "Always samples the full-resolution texture for authentic distance shimmer, like hardware without mipmapping."));
 
             EditorGUILayout.Space(4);
             editor.ShaderProperty(_posterize, new GUIContent("Color Crush + Dither",
@@ -164,6 +186,30 @@ namespace DNR.PSX.Editor
                     "5 bits matches the PS1's 15-bit framebuffer."));
                 editor.ShaderProperty(_ditherStrength, new GUIContent("Dither Strength",
                     "How strongly the Bayer dither pattern is applied before quantization."));
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        void DrawColorCRT(MaterialEditor editor)
+        {
+            EditorGUI.indentLevel++;
+            editor.ShaderProperty(_colorGrade, new GUIContent("Enable Color Grading",
+                "Hue / saturation / contrast applied to the final lit color, before the color crush."));
+            if (_colorGrade.floatValue > 0.5f)
+            {
+                editor.ShaderProperty(_hueShift, "Hue Shift");
+                editor.ShaderProperty(_saturation, "Saturation");
+                editor.ShaderProperty(_contrast, "Contrast");
+            }
+
+            EditorGUILayout.Space(4);
+            editor.ShaderProperty(_scanlines, new GUIContent("CRT Scanlines",
+                "Screen-space scanline overlay simulating a CRT display. Subtle values work best in VR."));
+            if (_scanlines.floatValue > 0.5f)
+            {
+                editor.ShaderProperty(_scanlineCount, new GUIContent("Scanline Count",
+                    "Number of scanlines over the screen height. 240 matches the PS1's typical output."));
+                editor.ShaderProperty(_scanlineIntensity, "Scanline Intensity");
             }
             EditorGUI.indentLevel--;
         }
@@ -263,6 +309,9 @@ namespace DNR.PSX.Editor
             SetKeyword(mat, "_DNR_PIXELATE", mat.GetFloat("_Pixelate") > 0.5f);
             SetKeyword(mat, "_DNR_POSTERIZE", mat.GetFloat("_Posterize") > 0.5f);
             SetKeyword(mat, "_DNR_VERTEXCOLOR", mat.GetFloat("_VertexColor") > 0.5f);
+            SetKeyword(mat, "_DNR_NOMIPS", mat.GetFloat("_NoMips") > 0.5f);
+            SetKeyword(mat, "_DNR_COLORGRADE", mat.GetFloat("_ColorGrade") > 0.5f);
+            SetKeyword(mat, "_DNR_SCANLINES", mat.GetFloat("_Scanlines") > 0.5f);
 
             int lighting = Mathf.RoundToInt(mat.GetFloat("_Lighting"));
             SetKeyword(mat, "_LIGHTING_VERTEX", lighting == 0);

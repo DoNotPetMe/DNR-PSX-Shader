@@ -21,10 +21,12 @@
 // ----------------------------------------------------------------------------
 sampler2D _MainTex;
 float4    _MainTex_ST;
+float4    _MainTex_TexelSize;
 fixed4    _Color;
 fixed     _Cutoff;
 
 sampler2D _EmissionMap;
+float4    _EmissionMap_TexelSize;
 half4     _EmissionColor;
 
 half _SnapStrength;
@@ -32,9 +34,17 @@ half _SnapResolution;
 half _AffineStrength;
 
 half _PixelResolution;
+half _PointFilter;
 
 half _ColorBits;
 half _DitherStrength;
+
+half _HueShift;
+half _Saturation;
+half _Contrast;
+
+half _ScanlineCount;
+half _ScanlineIntensity;
 
 half _ShadeStrength;
 half _MinBrightness;
@@ -82,6 +92,57 @@ fixed3 DNRPosterize(fixed3 col, float2 pixelPos)
     col = saturate(col + threshold * (_DitherStrength / steps));
     return floor(col * steps + 0.5) / steps;
 }
+
+// Snaps a UV to the center of the nearest texel so a bilinear sampler returns
+// (effectively) the point-filtered result, overriding the import setting.
+float2 DNRPointFilterUV(float2 uv, float4 texelSize)
+{
+    if (_PointFilter > 0.5 && texelSize.z > 1.0)
+        uv = (floor(uv * texelSize.zw) + 0.5) * texelSize.xy;
+    return uv;
+}
+
+// Texture sampling that can bypass mipmaps for authentic distance shimmer.
+inline fixed4 DNRSampleTex(sampler2D tex, float2 uv)
+{
+#if defined(_DNR_NOMIPS)
+    return tex2Dlod(tex, float4(uv, 0, 0));
+#else
+    return tex2D(tex, uv);
+#endif
+}
+
+#if defined(_DNR_COLORGRADE)
+// Compact RGB<->HSV (Sam Hocevar's branchless formulation).
+float3 DNRRgbToHsv(float3 c)
+{
+    float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    float4 p = lerp(float4(c.bg, K.wz), float4(c.gb, K.xy), step(c.b, c.g));
+    float4 q = lerp(float4(p.xyw, c.r), float4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+float3 DNRHsvToRgb(float3 c)
+{
+    float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * lerp(K.xxx, saturate(p - K.xxx), c.y);
+}
+
+// Hue shift -> saturation -> contrast, applied to the final lit color.
+fixed3 DNRColorGrade(fixed3 col)
+{
+    float3 hsv = DNRRgbToHsv(saturate(col));
+    hsv.x = frac(hsv.x + _HueShift / 360.0 + 1.0);
+    col = DNRHsvToRgb(hsv);
+    half luma = dot(col, half3(0.299, 0.587, 0.114));
+    col = lerp(luma.xxx, col, _Saturation);
+    col = (col - 0.5) * _Contrast + 0.5;
+    return saturate(col);
+}
+#endif
 
 // ----------------------------------------------------------------------------
 // Structures
@@ -197,7 +258,7 @@ fixed4 DNRFrag(v2f i) : SV_Target
     uv = (floor(uv * px) + 0.5) / px;
 #endif
 
-    fixed4 albedo = tex2D(_MainTex, uv) * _Color;
+    fixed4 albedo = DNRSampleTex(_MainTex, DNRPointFilterUV(uv, _MainTex_TexelSize)) * _Color;
 #if defined(_DNR_VERTEXCOLOR)
     albedo *= i.vColor;
 #endif
@@ -240,11 +301,22 @@ fixed4 DNRFrag(v2f i) : SV_Target
     fixed3 col = albedo.rgb * lighting;
 
 #if defined(_EMISSION) && defined(UNITY_PASS_FORWARDBASE)
-    col += tex2D(_EmissionMap, uv).rgb * _EmissionColor.rgb;
+    col += DNRSampleTex(_EmissionMap, DNRPointFilterUV(uv, _EmissionMap_TexelSize)).rgb * _EmissionColor.rgb;
+#endif
+
+#if defined(_DNR_COLORGRADE)
+    col = DNRColorGrade(col);
 #endif
 
 #if defined(_DNR_POSTERIZE)
     col = DNRPosterize(col, i.pos.xy);
+#endif
+
+#if defined(_DNR_SCANLINES)
+    // Smooth rolling scanline mask over screen height, after posterization -
+    // it simulates the display, not the console output.
+    float scan = 0.5 + 0.5 * cos(UNITY_TWO_PI * i.pos.y * _ScanlineCount / _ScreenParams.y);
+    col *= 1.0 - _ScanlineIntensity * scan;
 #endif
 
     fixed alpha = albedo.a;

@@ -18,7 +18,11 @@ your avatar's normal look and the PSX look.
   PS1 hardware.
 - **Color crush + dithering** — quantizes output color (5 bits/channel = the PS1's 15-bit
   framebuffer) with the PS1 GPU's 4×4 ordered Bayer dither pattern.
-- **Texture pixelation** — optional virtual texture resolution, no import-setting changes needed.
+- **Chunky texture sampling** — optional virtual texture resolution, forced point filtering that
+  overrides the texture's import setting, and a mipmap bypass for authentic distance shimmer.
+- **Full color grading** — hue shift, saturation, and contrast applied to the final lit color,
+  before the color crush.
+- **CRT scanlines** — screen-space scanline overlay with adjustable count and intensity.
 - **Three lighting modes** — *Vertex* (classic PSX per-vertex lighting), *Pixel* (smoother), and
   *Unlit*. All modes respect ambient probes, the main directional light with realtime shadows,
   additional realtime lights (ForwardAdd), and up to four per-vertex point lights.
@@ -87,7 +91,11 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
 | PSX Effects | Snap Resolution | Vertical resolution of the virtual framebuffer. 240 is authentic; lower = wobblier. |
 | PSX Effects | Affine Texture Warp | Perspective-incorrect texture blending. Most visible on large polygons. |
 | PSX Effects | Pixelate Texture | Optional virtual texture resolution (texels per UV tile). |
+| PSX Effects | Force Point Filtering | Crunchy texel-center sampling, overriding the texture's import filter. |
+| PSX Effects | Disable Mipmaps | Full-res sampling at all distances for authentic shimmer. |
 | PSX Effects | Color Crush + Dither | Bits per channel (5 = authentic) and Bayer dither strength. |
+| Color & CRT | Color Grading | Hue shift / saturation / contrast on the final lit color. |
+| Color & CRT | CRT Scanlines | Scanline count (240 = authentic) and intensity. Keep subtle in VR. |
 | Lighting | Lighting Mode | Vertex (classic PSX), Pixel (smooth), or Unlit. |
 | Lighting | Shading Strength | 1 = full diffuse shading/shadows, 0 = flat lighting that only picks up light color. |
 | Lighting | Minimum Brightness | Floor so the avatar never goes fully black in unlit worlds. |

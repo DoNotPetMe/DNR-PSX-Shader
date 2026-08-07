@@ -85,7 +85,7 @@ namespace DNR.PSX.Editor
             {
                 GUILayout.Label("DNR PSX  •  Avatar Setup", EditorStyles.boldLabel);
                 GUILayout.FlexibleSpace();
-                GUILayout.Label("v1.0.0", EditorStyles.miniLabel);
+                GUILayout.Label("v" + PSXShaderGUI.Version, EditorStyles.miniLabel);
             }
             EditorGUILayout.Space(2);
         }
