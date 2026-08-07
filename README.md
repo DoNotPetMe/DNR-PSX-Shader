@@ -43,6 +43,10 @@ your avatar's normal look and the PSX look.
 - **Builds the complete in-game toggle**: two animation clips (original ↔ PSX material swaps),
   an FX animator layer, a synced + saved Expression Parameter, and an Action Menu toggle.
   Re-running the tool updates everything in place instead of duplicating it.
+- **In-game setting radials (optional)**: pick from 8 shader settings — Vertex Snap, Affine
+  Warp, Pixelation, Color Crush, Dither, Scanlines, Dot Crawl, Hue Shift — and the tool builds
+  synced radial sliders in a "PSX Settings" Action Menu submenu so you can tune the look live
+  in game. Each radial costs 8 sync bits; the tool shows the cost and checks your budget.
 
 ---
 
@@ -74,6 +78,8 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
    (they're in the output folder). Use **Preview PSX On Avatar** / **Restore Originals** to compare.
 5. **Step 3** — click **Build In-Game Toggle**. Done — upload your avatar and flip the
    **PSX Shader** toggle in your Action Menu in game.
+6. **Step 4 (optional)** — tick the settings you want adjustable in game and click
+   **Build Setting Radials**. They appear in a **PSX Settings** submenu as radial sliders.
 
 > The toggle's default (OFF) state is your original materials, so your avatar looks unchanged
 > until you switch it on. The parameter is synced (everyone sees it) and saved (persists between
@@ -123,6 +129,15 @@ The builder is fully non-destructive and idempotent:
 
 Re-running the builder updates the existing clips, layer, parameter and control in place
 (material assets are also updated in place, preserving GUIDs so the animations keep working).
+
+### In-game radials
+
+VRChat animations can drive material **float** properties but not shader keywords, so each
+radial animates one float (via a motion-time state driven directly by a synced float
+parameter) and the tool force-enables the effect's keyword on your PSX materials so there is
+something to drive. Radials are no-ops while the PSX toggle is off (the original materials
+don't have these properties). Each radial costs 8 bits of the 256-bit parameter budget —
+build only the ones you'll actually play with.
 
 ---
 

@@ -44,6 +44,43 @@ namespace DNR.PSX.Editor
         }
 
         const string LayerName = "DNR PSX Toggle";
+        const string SettingsMenuName = "PSX Settings";
+
+        /// <summary>
+        /// A shader setting that can be exposed as an in-game radial slider.
+        /// VRChat animations can only drive material float properties (not
+        /// shader keywords), so each radial drives one float and force-enables
+        /// whatever keyword its effect needs on the PSX materials.
+        /// </summary>
+        public class RadialSetting
+        {
+            public string id;             // stable id used in parameter names
+            public string label;          // menu / layer label
+            public string property;       // animated material float property
+            public float min;             // value at radial = 0
+            public float max;             // value at radial = 1
+            public float defaultT;        // default radial position (0..1)
+            public string enableProperty; // float toggle forced to 1 (optional)
+            public string enableKeyword;  // keyword forced on (optional)
+        }
+
+        public static readonly RadialSetting[] RadialSettings =
+        {
+            new RadialSetting { id = "Snap",      label = "Vertex Snap",  property = "_SnapStrength",      min = 0f,    max = 1f,   defaultT = 1f },
+            new RadialSetting { id = "Affine",    label = "Affine Warp",  property = "_AffineStrength",    min = 0f,    max = 1f,   defaultT = 1f },
+            new RadialSetting { id = "Pixelate",  label = "Pixelation",   property = "_PixelResolution",   min = 512f,  max = 32f,  defaultT = 0.5f,
+                                enableProperty = "_Pixelate",   enableKeyword = "_DNR_PIXELATE" },
+            new RadialSetting { id = "Crush",     label = "Color Crush",  property = "_ColorBits",         min = 8f,    max = 3f,   defaultT = 0.6f,
+                                enableProperty = "_Posterize",  enableKeyword = "_DNR_POSTERIZE" },
+            new RadialSetting { id = "Dither",    label = "Dither",       property = "_DitherStrength",    min = 0f,    max = 1f,   defaultT = 1f,
+                                enableProperty = "_Posterize",  enableKeyword = "_DNR_POSTERIZE" },
+            new RadialSetting { id = "Scanlines", label = "Scanlines",    property = "_ScanlineIntensity", min = 0f,    max = 1f,   defaultT = 0.25f,
+                                enableProperty = "_Scanlines",  enableKeyword = "_DNR_SCANLINES" },
+            new RadialSetting { id = "DotCrawl",  label = "Dot Crawl",    property = "_DotCrawlIntensity", min = 0f,    max = 1f,   defaultT = 0.5f,
+                                enableProperty = "_DotCrawl",   enableKeyword = "_DNR_DOTCRAWL" },
+            new RadialSetting { id = "Hue",       label = "Hue Shift",    property = "_HueShift",          min = -180f, max = 180f, defaultT = 0.5f,
+                                enableProperty = "_ColorGrade", enableKeyword = "_DNR_COLORGRADE" },
+        };
 
         /// <summary>
         /// Builds or updates the complete toggle. Throws with a user-readable
@@ -84,6 +121,330 @@ namespace DNR.PSX.Editor
                    $"• Parameter: \"{settings.parameterName}\" (bool, synced, saved)\n" +
                    $"• Menu control: \"{settings.controlName}\"\n\n" +
                    $"Assets were saved to {settings.outputFolder}.";
+        }
+
+        // ------------------------------------------------------------ radials
+
+        /// <summary>
+        /// Builds or updates in-game radial sliders for the selected settings:
+        /// per setting, a motion-time FX layer + synced float parameter + a
+        /// Radial Puppet in a "PSX Settings" submenu linked into the target
+        /// menu. Also force-enables each setting's keyword on the PSX
+        /// materials so the animated float has an effect to drive.
+        /// </summary>
+        public static string BuildRadials(VRCAvatarDescriptor descriptor, List<SlotSwap> swaps,
+            List<string> selectedIds, BuildSettings settings)
+        {
+            if (descriptor == null)
+                throw new InvalidOperationException("The selected avatar has no VRC Avatar Descriptor.");
+
+            var selected = RadialSettings.Where(r => selectedIds.Contains(r.id)).ToList();
+            if (selected.Count == 0)
+                throw new InvalidOperationException("No settings selected. Tick at least one radial to build.");
+            if (selected.Count > VRCExpressionsMenu.MAX_CONTROLS)
+                throw new InvalidOperationException($"Pick at most {VRCExpressionsMenu.MAX_CONTROLS} radials (one submenu page).");
+
+            // Renderers that carry PSX materials, and the materials themselves.
+            var psxMaterials = new HashSet<Material>();
+            var renderers = new List<Renderer>();
+            foreach (var swap in swaps)
+            {
+                if (swap.renderer == null || swap.onMaterials == null) continue;
+                if (!swap.renderer.transform.IsChildOf(descriptor.transform)) continue;
+                bool hasPSX = false;
+                foreach (var mat in swap.onMaterials)
+                {
+                    if (mat != null && mat.shader != null && mat.shader.name == PSXMaterialConverter.ShaderName)
+                    {
+                        psxMaterials.Add(mat);
+                        hasPSX = true;
+                    }
+                }
+                if (hasPSX)
+                    renderers.Add(swap.renderer);
+            }
+            if (renderers.Count == 0)
+                throw new InvalidOperationException(
+                    "No PSX materials found. Generate PSX materials first (step 2 in the setup window).");
+
+            PSXMaterialConverter.EnsureFolder(settings.outputFolder);
+            Undo.RecordObject(descriptor, "Build PSX Radials");
+
+            // Check the parameter budget up front (8 bits per new float).
+            EnsureRadialParameterBudget(descriptor, selected, settings);
+
+            AnimatorController fx = GetOrCreateFXController(descriptor, settings.outputFolder);
+            bool writeDefaults = DetectWriteDefaults(fx);
+            VRCExpressionsMenu settingsMenu = GetOrCreateSettingsMenu(settings);
+
+            foreach (var setting in selected)
+            {
+                string param = $"{settings.parameterName}/{setting.id}";
+
+                // Make sure the effect is actually on, and its default float
+                // matches the radial's default position.
+                foreach (var mat in psxMaterials)
+                {
+                    if (!string.IsNullOrEmpty(setting.enableProperty))
+                        mat.SetFloat(setting.enableProperty, 1f);
+                    if (!string.IsNullOrEmpty(setting.enableKeyword))
+                        mat.EnableKeyword(setting.enableKeyword);
+                    mat.SetFloat(setting.property, Mathf.Lerp(setting.min, setting.max, setting.defaultT));
+                    EditorUtility.SetDirty(mat);
+                }
+
+                AnimationClip clip = WriteRadialClip(
+                    $"{settings.outputFolder}/PSX Radial {PSXMaterialConverter.Sanitize(setting.label)}.anim",
+                    descriptor.transform, renderers, setting);
+
+                EnsureFloatParameter(fx, param);
+                RebuildRadialLayer(fx, clip, param, $"DNR PSX Radial {setting.label}", writeDefaults);
+                EnsureExpressionFloat(descriptor, param, setting.defaultT, settings.outputFolder);
+                EnsureRadialControl(settingsMenu, setting.label, param);
+            }
+
+            EnsureSubmenuLink(descriptor, settingsMenu, settings);
+
+            EditorUtility.SetDirty(descriptor);
+            AssetDatabase.SaveAssets();
+            if (descriptor.gameObject.scene.IsValid())
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(descriptor.gameObject.scene);
+
+            return $"Built {selected.Count} in-game radial{(selected.Count == 1 ? "" : "s")}:\n\n" +
+                   string.Join("\n", selected.Select(s => $"• {s.label}")) +
+                   $"\n\nThey live in the \"{SettingsMenuName}\" submenu and cost " +
+                   $"{selected.Count * 8} sync bits total. Radials affect the PSX materials, so they " +
+                   "only do something visible while the PSX toggle is on.";
+        }
+
+        static void EnsureRadialParameterBudget(VRCAvatarDescriptor descriptor,
+            List<RadialSetting> selected, BuildSettings settings)
+        {
+            VRCExpressionParameters parameters = descriptor.expressionParameters;
+            if (parameters == null)
+                return; // asset will be created with plenty of room
+
+            int needed = 0;
+            foreach (var setting in selected)
+            {
+                string param = $"{settings.parameterName}/{setting.id}";
+                bool exists = parameters.parameters != null &&
+                              parameters.parameters.Any(p => p != null && p.name == param);
+                if (!exists)
+                    needed += VRCExpressionParameters.TypeCost(VRCExpressionParameters.ValueType.Float);
+            }
+            int total = parameters.CalcTotalCost() + needed;
+            if (total > VRCExpressionParameters.MAX_PARAMETER_COST)
+                throw new InvalidOperationException(
+                    $"Not enough Expression Parameter space: {parameters.CalcTotalCost()} bits used, " +
+                    $"{needed} more needed, max {VRCExpressionParameters.MAX_PARAMETER_COST}. " +
+                    "Untick some radials or free up parameter space.");
+        }
+
+        static AnimationClip WriteRadialClip(string path, Transform root, List<Renderer> renderers, RadialSetting setting)
+        {
+            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+            bool isNew = clip == null;
+            if (isNew)
+            {
+                clip = new AnimationClip();
+            }
+            else
+            {
+                clip.ClearCurves();
+                foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+                    AnimationUtility.SetObjectReferenceCurve(clip, binding, null);
+            }
+            clip.name = System.IO.Path.GetFileNameWithoutExtension(path);
+
+            foreach (var renderer in renderers)
+            {
+                var binding = EditorCurveBinding.FloatCurve(
+                    AnimationUtility.CalculateTransformPath(renderer.transform, root),
+                    renderer.GetType(),
+                    "material." + setting.property);
+                AnimationUtility.SetEditorCurve(clip, binding,
+                    AnimationCurve.Linear(0f, setting.min, 1f, setting.max));
+            }
+
+            if (isNew)
+                AssetDatabase.CreateAsset(clip, path);
+            else
+                EditorUtility.SetDirty(clip);
+            return clip;
+        }
+
+        static void EnsureFloatParameter(AnimatorController controller, string name)
+        {
+            var existing = controller.parameters.FirstOrDefault(p => p.name == name);
+            if (existing != null)
+            {
+                if (existing.type == AnimatorControllerParameterType.Float)
+                    return;
+                controller.RemoveParameter(existing);
+            }
+            controller.AddParameter(name, AnimatorControllerParameterType.Float);
+        }
+
+        // One state whose motion time is driven directly by the float
+        // parameter - the standard way to bind a radial to a 0..1 sweep.
+        static void RebuildRadialLayer(AnimatorController controller, AnimationClip clip,
+            string parameter, string layerName, bool writeDefaults)
+        {
+            RemoveLayer(controller, layerName);
+
+            var stateMachine = new AnimatorStateMachine
+            {
+                name = layerName,
+                hideFlags = HideFlags.HideInHierarchy
+            };
+            if (AssetDatabase.Contains(controller))
+                AssetDatabase.AddObjectToAsset(stateMachine, controller);
+
+            var layer = new AnimatorControllerLayer
+            {
+                name = layerName,
+                defaultWeight = 1f,
+                stateMachine = stateMachine
+            };
+
+            AnimatorState state = stateMachine.AddState(layerName, new Vector3(260, 120));
+            state.motion = clip;
+            state.writeDefaultValues = writeDefaults;
+            state.timeParameterActive = true;
+            state.timeParameter = parameter;
+
+            stateMachine.defaultState = state;
+            controller.AddLayer(layer);
+            EditorUtility.SetDirty(controller);
+        }
+
+        static void EnsureExpressionFloat(VRCAvatarDescriptor descriptor, string name, float defaultValue, string folder)
+        {
+            VRCExpressionParameters parameters = descriptor.expressionParameters;
+            if (parameters == null)
+            {
+                parameters = ScriptableObject.CreateInstance<VRCExpressionParameters>();
+                parameters.parameters = new VRCExpressionParameters.Parameter[0];
+                string path = AssetDatabase.GenerateUniqueAssetPath(folder + "/PSX Expression Parameters.asset");
+                AssetDatabase.CreateAsset(parameters, path);
+                descriptor.expressionParameters = parameters;
+                descriptor.customExpressions = true;
+            }
+
+            var list = parameters.parameters?.ToList() ?? new List<VRCExpressionParameters.Parameter>();
+            var existing = list.FirstOrDefault(p => p != null && p.name == name);
+            if (existing != null)
+            {
+                existing.valueType = VRCExpressionParameters.ValueType.Float;
+                existing.defaultValue = defaultValue;
+                existing.saved = true;
+                existing.networkSynced = true;
+            }
+            else
+            {
+                int cost = parameters.CalcTotalCost() + VRCExpressionParameters.TypeCost(VRCExpressionParameters.ValueType.Float);
+                if (cost > VRCExpressionParameters.MAX_PARAMETER_COST)
+                    throw new InvalidOperationException(
+                        $"Not enough Expression Parameter space for \"{name}\" " +
+                        $"({parameters.CalcTotalCost()}/{VRCExpressionParameters.MAX_PARAMETER_COST} bits used, 8 more needed).");
+
+                list.Add(new VRCExpressionParameters.Parameter
+                {
+                    name = name,
+                    valueType = VRCExpressionParameters.ValueType.Float,
+                    defaultValue = defaultValue,
+                    saved = true,
+                    networkSynced = true
+                });
+            }
+            parameters.parameters = list.ToArray();
+            EditorUtility.SetDirty(parameters);
+        }
+
+        static VRCExpressionsMenu GetOrCreateSettingsMenu(BuildSettings settings)
+        {
+            string path = settings.outputFolder + "/PSX Settings Menu.asset";
+            var menu = AssetDatabase.LoadAssetAtPath<VRCExpressionsMenu>(path);
+            if (menu == null)
+            {
+                menu = ScriptableObject.CreateInstance<VRCExpressionsMenu>();
+                AssetDatabase.CreateAsset(menu, path);
+            }
+            return menu;
+        }
+
+        static void EnsureRadialControl(VRCExpressionsMenu menu, string label, string parameter)
+        {
+            var existing = menu.controls.FirstOrDefault(c =>
+                c != null &&
+                c.type == VRCExpressionsMenu.Control.ControlType.RadialPuppet &&
+                c.subParameters != null && c.subParameters.Length > 0 &&
+                c.subParameters[0] != null && c.subParameters[0].name == parameter);
+
+            if (existing != null)
+            {
+                existing.name = label;
+            }
+            else
+            {
+                if (menu.controls.Count >= VRCExpressionsMenu.MAX_CONTROLS)
+                    throw new InvalidOperationException(
+                        $"The \"{SettingsMenuName}\" submenu is full ({VRCExpressionsMenu.MAX_CONTROLS} controls).");
+
+                menu.controls.Add(new VRCExpressionsMenu.Control
+                {
+                    name = label,
+                    type = VRCExpressionsMenu.Control.ControlType.RadialPuppet,
+                    subParameters = new[] { new VRCExpressionsMenu.Control.Parameter { name = parameter } }
+                });
+            }
+            EditorUtility.SetDirty(menu);
+        }
+
+        static void EnsureSubmenuLink(VRCAvatarDescriptor descriptor, VRCExpressionsMenu settingsMenu, BuildSettings settings)
+        {
+            VRCExpressionsMenu parent = settings.targetMenu;
+            if (parent == null)
+            {
+                parent = descriptor.expressionsMenu;
+                if (parent == null)
+                {
+                    parent = ScriptableObject.CreateInstance<VRCExpressionsMenu>();
+                    string path = AssetDatabase.GenerateUniqueAssetPath(settings.outputFolder + "/PSX Expressions Menu.asset");
+                    AssetDatabase.CreateAsset(parent, path);
+                    descriptor.expressionsMenu = parent;
+                    descriptor.customExpressions = true;
+                }
+            }
+            if (parent == settingsMenu)
+                return; // user pointed the target at the settings menu itself
+
+            var existing = parent.controls.FirstOrDefault(c =>
+                c != null &&
+                c.type == VRCExpressionsMenu.Control.ControlType.SubMenu &&
+                (c.subMenu == settingsMenu || c.name == SettingsMenuName));
+
+            if (existing != null)
+            {
+                existing.name = SettingsMenuName;
+                existing.subMenu = settingsMenu;
+            }
+            else
+            {
+                if (parent.controls.Count >= VRCExpressionsMenu.MAX_CONTROLS)
+                    throw new InvalidOperationException(
+                        $"The target menu \"{parent.name}\" is full ({VRCExpressionsMenu.MAX_CONTROLS} controls), " +
+                        $"so the \"{SettingsMenuName}\" submenu cannot be added. Pick a different menu or free a slot.");
+
+                parent.controls.Add(new VRCExpressionsMenu.Control
+                {
+                    name = SettingsMenuName,
+                    type = VRCExpressionsMenu.Control.ControlType.SubMenu,
+                    subMenu = settingsMenu
+                });
+            }
+            EditorUtility.SetDirty(parent);
         }
 
         // -------------------------------------------------------------- clips

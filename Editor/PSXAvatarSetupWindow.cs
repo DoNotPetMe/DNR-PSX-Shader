@@ -34,6 +34,7 @@ namespace DNR.PSX.Editor
         [SerializeField] string parameterName = "PSXShader";
         [SerializeField] string controlName = "PSX Shader";
         [SerializeField] bool psxApplied;
+        [SerializeField] List<string> selectedRadials = new List<string>();
 #if DNR_VRC_AVATARS
         [SerializeField] VRCExpressionsMenu targetMenu;
 #endif
@@ -75,6 +76,7 @@ namespace DNR.PSX.Editor
             DrawOutputFolder();
             DrawMaterialSection();
             DrawToggleSection();
+            DrawRadialsSection();
             EditorGUILayout.EndScrollView();
         }
 
@@ -230,6 +232,53 @@ namespace DNR.PSX.Editor
                 "VRChat Avatars SDK (com.vrchat.avatars) not found in this project. " +
                 "Install it through the VRChat Creator Companion to build the in-game toggle. " +
                 "Material generation above still works without it.", MessageType.Info);
+#endif
+        }
+
+        void DrawRadialsSection()
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("4. In-Game Setting Radials (Optional)", EditorStyles.boldLabel);
+
+#if DNR_VRC_AVATARS
+            var descriptor = avatar != null ? avatar.GetComponent<VRCAvatarDescriptor>() : null;
+            if (descriptor == null)
+            {
+                EditorGUILayout.HelpBox("Needs a VRC Avatar Descriptor (see step 3).", MessageType.None);
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                "Adds radial sliders to your Action Menu (in a \"PSX Settings\" submenu) that adjust the " +
+                "shader live in game. Each radial is a synced float: 8 bits of your 256-bit parameter budget. " +
+                "Radials drive the PSX materials, so they only show while the PSX toggle is on.",
+                MessageType.None);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                foreach (var setting in PSXToggleBuilder.RadialSettings)
+                {
+                    bool selected = selectedRadials.Contains(setting.id);
+                    bool now = EditorGUILayout.ToggleLeft(setting.label, selected);
+                    if (now && !selected) selectedRadials.Add(setting.id);
+                    else if (!now && selected) selectedRadials.Remove(setting.id);
+                }
+            }
+
+            int used = descriptor.expressionParameters != null ? descriptor.expressionParameters.CalcTotalCost() : 0;
+            EditorGUILayout.LabelField(
+                $"Cost: {selectedRadials.Count * 8} bits for {selectedRadials.Count} radial(s)  •  " +
+                $"currently used: {used}/{VRCExpressionParameters.MAX_PARAMETER_COST}",
+                EditorStyles.miniLabel);
+
+            using (new EditorGUI.DisabledScope(selectedRadials.Count == 0 || string.IsNullOrWhiteSpace(parameterName)))
+            {
+                if (GUILayout.Button("Build Setting Radials", GUILayout.Height(28)))
+                    BuildRadials(descriptor);
+            }
+#else
+            EditorGUILayout.HelpBox(
+                "Requires the VRChat Avatars SDK (see step 3).", MessageType.None);
 #endif
         }
 
@@ -397,5 +446,39 @@ namespace DNR.PSX.Editor
             }
 #endif
         }
+
+#if DNR_VRC_AVATARS
+        void BuildRadials(VRCAvatarDescriptor descriptor)
+        {
+            try
+            {
+                var swaps = entries
+                    .Where(e => e.include && e.renderer != null)
+                    .Select(e => new PSXToggleBuilder.SlotSwap
+                    {
+                        renderer = e.renderer,
+                        offMaterials = e.originals.ToArray(),
+                        onMaterials = e.psx.ToArray()
+                    })
+                    .ToList();
+
+                var settings = new PSXToggleBuilder.BuildSettings
+                {
+                    parameterName = parameterName.Trim(),
+                    outputFolder = outputFolder,
+                    targetMenu = targetMenu
+                };
+
+                string report = PSXToggleBuilder.BuildRadials(descriptor, swaps, selectedRadials, settings);
+                EditorUtility.DisplayDialog("PSX Radials", report, "Nice");
+                Debug.Log($"[DNR PSX] {report}");
+            }
+            catch (Exception e)
+            {
+                EditorUtility.DisplayDialog("PSX Radials Build Failed", e.Message, "OK");
+                Debug.LogException(e);
+            }
+        }
+#endif
     }
 }

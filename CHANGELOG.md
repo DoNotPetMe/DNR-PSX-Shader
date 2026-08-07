@@ -4,6 +4,17 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-07
+
+### Added
+- **In-game setting radials**: optional step 4 in the setup window. Pick any of 8 shader
+  settings (Vertex Snap, Affine Warp, Pixelation, Color Crush, Dither, Scanlines, Dot Crawl,
+  Hue Shift) and the tool builds, per setting: a motion-time FX layer, a synced + saved float
+  parameter, and a Radial Puppet in a "PSX Settings" submenu linked into your menu. Effects
+  needed by a radial are force-enabled on the PSX materials (keywords cannot be animated),
+  with material defaults aligned to the radial's default position. Idempotent re-runs,
+  up-front parameter budget check, and a live bit-cost readout in the window.
+
 ## [1.2.0] - 2026-08-07
 
 ### Added

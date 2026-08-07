@@ -20,7 +20,7 @@ namespace DNR.PSX.Editor
             Transparent = 2
         }
 
-        public const string Version = "1.2.0";
+        public const string Version = "1.3.0";
 
         // ------------------------------------------------------------ state
         MaterialProperty _mode, _mainTex, _color, _cutoff, _vertexColor;
