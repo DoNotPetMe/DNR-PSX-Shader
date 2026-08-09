@@ -65,6 +65,27 @@ Shader "DNR/PSX"
         _DotCrawlAvatarMotion ("Avatar Motion", Range(0, 1)) = 0.5
         _DotCrawlCoverage ("Edge Coverage", Range(0.05, 1)) = 0.35
 
+        // ----------------------------------------------------- horror / grunge
+        [Toggle(_DNR_HORROR)] _Horror ("Survival Horror Grade", Float) = 0
+        _HorrorFogColor ("Fog Color", Color) = (0.30, 0.32, 0.29, 1)
+        _HorrorFogStart ("Fog Start", Range(0, 20)) = 2
+        _HorrorFogEnd ("Fog End", Range(0.5, 60)) = 12
+        _HorrorFogDensity ("Fog Density", Range(0, 1)) = 0.5
+        _GrainStrength ("Film Grain", Range(0, 1)) = 0.15
+        _GrainSize ("Grain Size", Range(1, 8)) = 2
+        [Toggle] _GrainAnimate ("Animate Grain", Float) = 1
+        _VignetteStrength ("Vignette", Range(0, 1)) = 0.35
+        _VignetteSoftness ("Vignette Softness", Range(0.05, 1)) = 0.5
+        _HorrorCrush ("Black Crush", Range(0, 0.5)) = 0.05
+        _HorrorLift ("Black Lift (Fade)", Range(0, 0.5)) = 0
+        _HorrorTint ("Grade Tint", Color) = (0.95, 0.96, 0.90, 1)
+
+        [Toggle(_DNR_GRUNGEMAP)] _GrungeEnabled ("Grunge Overlay", Float) = 0
+        _GrungeMap ("Grunge Map", 2D) = "white" {}
+        _GrungeStrength ("Grunge Strength", Range(0, 1)) = 0.5
+        [Enum(Multiply,0,Overlay,1)] _GrungeBlend ("Grunge Blend", Float) = 0
+        [Toggle] _GrungeScreenSpace ("Screen Space Grunge", Float) = 0
+
         // ----------------------------------------------------------- lighting
         [KeywordEnum(Vertex, Pixel, Unlit)] _Lighting ("Lighting Mode", Float) = 0
         _ShadeStrength ("Shading Strength", Range(0, 1)) = 1
@@ -124,6 +145,8 @@ Shader "DNR/PSX"
             #pragma shader_feature_local _ALPHABLEND_ON
             #pragma shader_feature_local _DNR_ALPHAMASK
             #pragma shader_feature_local _DNR_PREMULTIPLY
+            #pragma shader_feature_local _DNR_HORROR
+            #pragma shader_feature_local _DNR_GRUNGEMAP
 
             #include "Includes/DNRPSXCore.cginc"
             ENDCG

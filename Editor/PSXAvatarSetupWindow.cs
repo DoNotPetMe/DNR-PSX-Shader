@@ -40,6 +40,7 @@ namespace DNR.PSX.Editor
         [SerializeField] bool globalEffects = true;
         [SerializeField] bool globalColor = true;
         [SerializeField] bool globalLighting = true;
+        [SerializeField] bool globalHorror = true;
         [SerializeField] bool globalIncludeFolder;
         [SerializeField] bool globalLiveSync;
 
@@ -347,6 +348,7 @@ namespace DNR.PSX.Editor
                 EditorGUILayout.LabelField("Apply Groups", GUILayout.Width(EditorGUIUtility.labelWidth - 2));
                 globalEffects = GUILayout.Toggle(globalEffects, "PSX", EditorStyles.miniButtonLeft);
                 globalColor = GUILayout.Toggle(globalColor, "Color/CRT", EditorStyles.miniButtonMid);
+                globalHorror = GUILayout.Toggle(globalHorror, "Horror", EditorStyles.miniButtonMid);
                 globalLighting = GUILayout.Toggle(globalLighting, "Lighting", EditorStyles.miniButtonRight);
             }
 
@@ -362,6 +364,26 @@ namespace DNR.PSX.Editor
                 globalLiveSync);
             if (EditorGUI.EndChangeCheck() && globalLiveSync)
                 presetFingerprint = CurrentFingerprint();
+
+            EditorGUILayout.Space(2);
+            EditorGUILayout.LabelField("Start From A Style", EditorStyles.miniBoldLabel);
+            var styles = PSXPresets.All;
+            for (int row = 0; row < styles.Length; row += 2)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    for (int i = row; i < Mathf.Min(row + 2, styles.Length); i++)
+                    {
+                        var style = styles[i];
+                        if (GUILayout.Button(new GUIContent(style.name, style.tooltip), EditorStyles.miniButton))
+                        {
+                            Undo.RecordObject(globalPreset, "Apply PSX Preset");
+                            PSXPresets.Apply(style, globalPreset);
+                            presetFingerprint = CurrentFingerprint();
+                        }
+                    }
+                }
+            }
 
             // The preset is edited through the real material inspector, so the
             // tool never drifts out of sync with the shader's own UI.
@@ -394,7 +416,7 @@ namespace DNR.PSX.Editor
 
         int CurrentFingerprint()
         {
-            return PSXGlobalSettings.Fingerprint(globalPreset, globalEffects, globalColor, globalLighting);
+            return PSXGlobalSettings.Fingerprint(globalPreset, globalEffects, globalColor, globalLighting, globalHorror);
         }
 
         /// <summary>Every PSX material this window should keep in sync.</summary>
@@ -441,7 +463,8 @@ namespace DNR.PSX.Editor
         {
             try
             {
-                int count = PSXGlobalSettings.Apply(globalPreset, targets, globalEffects, globalColor, globalLighting);
+                int count = PSXGlobalSettings.Apply(
+                    globalPreset, targets, globalEffects, globalColor, globalLighting, globalHorror);
                 if (verbose)
                 {
                     EditorUtility.DisplayDialog("PSX Global Look",
@@ -468,10 +491,7 @@ namespace DNR.PSX.Editor
                 return;
             }
             Undo.RecordObject(globalPreset, "Pull PSX Settings");
-            foreach (string property in PSXGlobalSettings.Gather(true, true, true))
-                if (targets[0].HasProperty(property) && globalPreset.HasProperty(property))
-                    globalPreset.SetFloat(property, targets[0].GetFloat(property));
-            PSXShaderGUI.ValidateKeywords(globalPreset);
+            PSXGlobalSettings.CopyAll(targets[0], globalPreset);
             EditorUtility.SetDirty(globalPreset);
             AssetDatabase.SaveAssets();
             presetFingerprint = CurrentFingerprint();

@@ -20,7 +20,7 @@ namespace DNR.PSX.Editor
             Transparent = 2
         }
 
-        public const string Version = "1.6.0";
+        public const string Version = "1.7.0";
 
         // ------------------------------------------------------------ state
         MaterialProperty _mode, _mainTex, _color, _cutoff, _vertexColor;
@@ -34,6 +34,11 @@ namespace DNR.PSX.Editor
         MaterialProperty _scanlines, _scanlineCount, _scanlineIntensity;
         MaterialProperty _dotCrawl, _dotCrawlIntensity, _dotCrawlSize, _dotCrawlSpeed, _dotCrawlCoverage;
         MaterialProperty _dotCrawlViewMotion, _dotCrawlAvatarMotion;
+        MaterialProperty _horror, _horrorFogColor, _horrorFogStart, _horrorFogEnd, _horrorFogDensity;
+        MaterialProperty _grainStrength, _grainSize, _grainAnimate;
+        MaterialProperty _vignetteStrength, _vignetteSoftness;
+        MaterialProperty _horrorCrush, _horrorLift, _horrorTint;
+        MaterialProperty _grungeEnabled, _grungeMap, _grungeStrength, _grungeBlend, _grungeScreenSpace;
         MaterialProperty _lighting, _shadeStrength, _minBrightness;
         MaterialProperty _cull;
 
@@ -41,6 +46,7 @@ namespace DNR.PSX.Editor
         static bool foldTransparency;
         static bool foldPSX = true;
         static bool foldColorCRT = true;
+        static bool foldHorror;
         static bool foldLighting = true;
         static bool foldAdvanced;
 
@@ -56,6 +62,7 @@ namespace DNR.PSX.Editor
                 ValidateKeywords(mat);
 
             DrawHeader();
+            DrawPresets(editor);
             DrawRenderModePopup(editor);
 
             foldSurface = Foldout(foldSurface, "Surface");
@@ -73,6 +80,10 @@ namespace DNR.PSX.Editor
             foldColorCRT = Foldout(foldColorCRT, "Color & CRT");
             if (foldColorCRT)
                 DrawColorCRT(editor);
+
+            foldHorror = Foldout(foldHorror, "Survival Horror & Grunge");
+            if (foldHorror)
+                DrawHorror(editor);
 
             foldLighting = Foldout(foldLighting, "Lighting");
             if (foldLighting)
@@ -124,6 +135,24 @@ namespace DNR.PSX.Editor
             _dotCrawlCoverage  = FindProperty("_DotCrawlCoverage", props);
             _dotCrawlViewMotion   = FindProperty("_DotCrawlViewMotion", props);
             _dotCrawlAvatarMotion = FindProperty("_DotCrawlAvatarMotion", props);
+            _horror           = FindProperty("_Horror", props);
+            _horrorFogColor   = FindProperty("_HorrorFogColor", props);
+            _horrorFogStart   = FindProperty("_HorrorFogStart", props);
+            _horrorFogEnd     = FindProperty("_HorrorFogEnd", props);
+            _horrorFogDensity = FindProperty("_HorrorFogDensity", props);
+            _grainStrength    = FindProperty("_GrainStrength", props);
+            _grainSize        = FindProperty("_GrainSize", props);
+            _grainAnimate     = FindProperty("_GrainAnimate", props);
+            _vignetteStrength = FindProperty("_VignetteStrength", props);
+            _vignetteSoftness = FindProperty("_VignetteSoftness", props);
+            _horrorCrush      = FindProperty("_HorrorCrush", props);
+            _horrorLift       = FindProperty("_HorrorLift", props);
+            _horrorTint       = FindProperty("_HorrorTint", props);
+            _grungeEnabled    = FindProperty("_GrungeEnabled", props);
+            _grungeMap        = FindProperty("_GrungeMap", props);
+            _grungeStrength   = FindProperty("_GrungeStrength", props);
+            _grungeBlend      = FindProperty("_GrungeBlend", props);
+            _grungeScreenSpace = FindProperty("_GrungeScreenSpace", props);
             _lighting        = FindProperty("_Lighting", props);
             _shadeStrength   = FindProperty("_ShadeStrength", props);
             _minBrightness   = FindProperty("_MinBrightness", props);
@@ -306,6 +335,91 @@ namespace DNR.PSX.Editor
             EditorGUI.indentLevel--;
         }
 
+        void DrawPresets(MaterialEditor editor)
+        {
+            EditorGUILayout.LabelField("Presets", EditorStyles.miniBoldLabel);
+            var presets = PSXPresets.All;
+            for (int row = 0; row < presets.Length; row += 2)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    for (int i = row; i < Mathf.Min(row + 2, presets.Length); i++)
+                    {
+                        var preset = presets[i];
+                        if (GUILayout.Button(new GUIContent(preset.name, preset.tooltip), EditorStyles.miniButton))
+                        {
+                            Undo.RecordObjects(editor.targets, "Apply PSX Preset");
+                            foreach (Material mat in editor.targets)
+                                PSXPresets.Apply(preset, mat);
+                        }
+                    }
+                }
+            }
+            EditorGUILayout.Space(2);
+        }
+
+        void DrawHorror(MaterialEditor editor)
+        {
+            EditorGUI.indentLevel++;
+            editor.ShaderProperty(_horror, new GUIContent("Survival Horror Grade",
+                "The PS1 horror look: fog closing in, film grain, vignette and a crushed, muddy palette."));
+
+            if (_horror.floatValue > 0.5f)
+            {
+                EditorGUILayout.LabelField("Atmosphere", EditorStyles.miniBoldLabel);
+                editor.ShaderProperty(_horrorFogDensity, new GUIContent("Fog Density",
+                    "How completely distance swallows the avatar. This fog is per-material, so it works in " +
+                    "any world regardless of that world's own fog settings."));
+                editor.ShaderProperty(_horrorFogColor, "Fog Color");
+                editor.ShaderProperty(_horrorFogStart, new GUIContent("Fog Start", "Metres from the viewer where fog begins."));
+                editor.ShaderProperty(_horrorFogEnd, new GUIContent("Fog End", "Metres where fog reaches full density."));
+
+                EditorGUILayout.Space(3);
+                EditorGUILayout.LabelField("Film", EditorStyles.miniBoldLabel);
+                editor.ShaderProperty(_grainStrength, "Film Grain");
+                if (_grainStrength.floatValue > 0f)
+                {
+                    editor.ShaderProperty(_grainSize, new GUIContent("Grain Size", "Grain cell size in screen pixels."));
+                    editor.ShaderProperty(_grainAnimate, new GUIContent("Animate Grain",
+                        "Steps at 24fps for a film flicker. Turn off for a static dirty-lens look."));
+                }
+                editor.ShaderProperty(_vignetteStrength, new GUIContent("Vignette",
+                    "Darkens the screen edges. In VR each eye vignettes around its own centre — keep it moderate."));
+                if (_vignetteStrength.floatValue > 0f)
+                    editor.ShaderProperty(_vignetteSoftness, "Vignette Softness");
+
+                EditorGUILayout.Space(3);
+                EditorGUILayout.LabelField("Palette", EditorStyles.miniBoldLabel);
+                editor.ShaderProperty(_horrorCrush, new GUIContent("Black Crush",
+                    "Pushes dark tones to pure black, the way cheap contrast-boosted horror art looks."));
+                editor.ShaderProperty(_horrorLift, new GUIContent("Black Lift (Fade)",
+                    "Raises blacks toward grey for a washed-out, faded-tape feel. Opposite of crush."));
+                editor.ShaderProperty(_horrorTint, new GUIContent("Grade Tint",
+                    "Multiplied over the whole surface. Sepia for Resident Evil, sickly green-grey for Silent Hill."));
+                EditorGUILayout.HelpBox(
+                    "Pair this with Saturation in the Color & CRT section — the horror palette is mostly " +
+                    "desaturation plus tint.", MessageType.None);
+            }
+
+            EditorGUILayout.Space(4);
+            editor.ShaderProperty(_grungeEnabled, new GUIContent("Grunge Overlay",
+                "Layers a dirt/grime texture over the albedo. Supply your own grunge texture — a greyscale " +
+                "dirt, rust or noise map works best."));
+            if (_grungeEnabled.floatValue > 0.5f)
+            {
+                editor.TexturePropertySingleLine(new GUIContent("Grunge Map"), _grungeMap);
+                editor.TextureScaleOffsetProperty(_grungeMap);
+                editor.ShaderProperty(_grungeStrength, "Strength");
+                editor.ShaderProperty(_grungeBlend, new GUIContent("Blend",
+                    "Multiply darkens with the grime. Overlay keeps midtones and adds contrast."));
+                editor.ShaderProperty(_grungeScreenSpace, new GUIContent("Screen Space",
+                    "Projects the grime on screen like muck on the camera lens instead of following the mesh."));
+                if (_grungeMap.textureValue == null)
+                    EditorGUILayout.HelpBox("Assign a grunge texture — with none set, this does nothing.", MessageType.Warning);
+            }
+            EditorGUI.indentLevel--;
+        }
+
         void DrawLighting(MaterialEditor editor)
         {
             EditorGUI.indentLevel++;
@@ -410,6 +524,8 @@ namespace DNR.PSX.Editor
             SetKeyword(mat, "_DNR_DOTCRAWL", mat.GetFloat("_DotCrawl") > 0.5f);
             SetKeyword(mat, "_DNR_ALPHAMASK", mat.GetFloat("_AlphaMaskEnabled") > 0.5f);
             SetKeyword(mat, "_DNR_PREMULTIPLY", mat.GetFloat("_Premultiply") > 0.5f);
+            SetKeyword(mat, "_DNR_HORROR", mat.GetFloat("_Horror") > 0.5f);
+            SetKeyword(mat, "_DNR_GRUNGEMAP", mat.GetFloat("_GrungeEnabled") > 0.5f);
 
             int lighting = Mathf.RoundToInt(mat.GetFloat("_Lighting"));
             SetKeyword(mat, "_LIGHTING_VERTEX", lighting == 0);

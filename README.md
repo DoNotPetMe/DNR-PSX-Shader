@@ -25,6 +25,12 @@ your avatar's normal look and the PSX look.
 - **CRT scanlines** — screen-space scanline overlay with adjustable count and intensity.
 - **Composite dot crawl** — the little crawling R/G/B beads old TVs showed along a character's
   silhouette and sharp detail when consoles were hooked up over composite video.
+- **Survival horror grade** — the Resident Evil / Silent Hill look: per-material distance fog
+  that closes in a few metres out (works in any world, regardless of that world's fog),
+  animated 24fps film grain, vignette, black crush/lift and a palette tint.
+- **Grunge overlay** — layer your own dirt, rust or noise texture over the albedo, following
+  the mesh UVs or projected in screen space like muck on the lens.
+- **One-click presets** — Authentic PS1, Survival Horror, Foggy Nightmare, Clean Retro.
 - **Three lighting modes** — *Vertex* (classic PSX per-vertex lighting), *Pixel* (smoother), and
   *Unlit*. All modes respect ambient probes, the main directional light with realtime shadows,
   additional realtime lights (ForwardAdd), and up to four per-vertex point lights.
@@ -118,6 +124,13 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
 | Color & CRT | Color Grading | Hue shift / saturation / contrast on the final lit color. |
 | Color & CRT | CRT Scanlines | Scanline count (240 = authentic) and intensity. Keep subtle in VR. |
 | Color & CRT | Composite Dot Crawl | Crawling R/G/B edge beads: intensity, dot size, auto crawl speed, viewer-motion and avatar-motion response, edge coverage. Set Auto Crawl Speed to 0 for beads that only move when the viewer or avatar moves — each viewer sees the crawl driven by their own movement. |
+| Horror & Grunge | Survival Horror Grade | Master toggle for the RE/SH look. |
+| Horror & Grunge | Fog Density / Color / Start / End | Per-material distance fog, independent of the world's fog. The single biggest part of the Silent Hill look. |
+| Horror & Grunge | Film Grain / Size / Animate | Animated 24fps grain, or static for a dirty-lens feel. |
+| Horror & Grunge | Vignette / Softness | Darkened screen edges. Keep moderate in VR. |
+| Horror & Grunge | Black Crush / Black Lift | Crush shadows to black, or lift them to grey for a faded-tape look. |
+| Horror & Grunge | Grade Tint | Sepia for Resident Evil, sickly green-grey for Silent Hill. |
+| Horror & Grunge | Grunge Overlay | Your own dirt texture over the albedo: strength, multiply/overlay blend, UV or screen space. |
 | Lighting | Lighting Mode | Vertex (classic PSX), Pixel (smooth), or Unlit. |
 | Lighting | Shading Strength | 1 = full diffuse shading/shadows, 0 = flat lighting that only picks up light color. |
 | Lighting | Minimum Brightness | Floor so the avatar never goes fully black in unlit worlds. |
@@ -211,6 +224,7 @@ Editor/
   PSXShaderGUI.cs         Custom material inspector
   PSXMaterialConverter.cs Material conversion (Poiyomi/lilToon aware)
   PSXGlobalSettings.cs    Shared-look propagation across materials
+  PSXPresets.cs           Built-in style presets
   PSXToggleBuilder.cs     FX layer / parameters / menu builder (needs VRC SDK)
   PSXAvatarSetupWindow.cs The setup window (Tools ▸ DNR PSX ▸ Avatar Setup)
 ```

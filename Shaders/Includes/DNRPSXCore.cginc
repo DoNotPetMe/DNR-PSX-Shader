@@ -62,6 +62,28 @@ half _DotCrawlCoverage;
 half _DotCrawlViewMotion;
 half _DotCrawlAvatarMotion;
 
+// Survival-horror grade: atmospheric fog, film grain, vignette and the muddy
+// crushed-black palette of the PS1 horror era.
+half4 _HorrorFogColor;
+half  _HorrorFogStart;
+half  _HorrorFogEnd;
+half  _HorrorFogDensity;
+half  _GrainStrength;
+half  _GrainSize;
+half  _GrainAnimate;
+half  _VignetteStrength;
+half  _VignetteSoftness;
+half  _HorrorCrush;
+half  _HorrorLift;
+half4 _HorrorTint;
+
+// Grime layer applied over the albedo.
+sampler2D _GrungeMap;
+float4    _GrungeMap_ST;
+half      _GrungeStrength;
+half      _GrungeBlend;       // 0=Multiply 1=Overlay
+half      _GrungeScreenSpace;
+
 half _ShadeStrength;
 half _MinBrightness;
 
@@ -186,6 +208,76 @@ fixed3 DNRDotCrawl(fixed3 col, float2 pixelPos, float3 worldNormal, float3 world
                          channel == 1u ? 1.0 : 0.0,
                          channel == 2u ? 1.0 : 0.0);
     return lerp(col, bead, mask * checker * _DotCrawlIntensity);
+}
+#endif
+
+#if defined(_DNR_HORROR)
+// Cheap per-pixel hash for film grain.
+inline float DNRHash21(float2 p)
+{
+    p = frac(p * float2(443.8975, 397.2973));
+    p += dot(p, p.yx + 19.19);
+    return frac((p.x + p.y) * p.x);
+}
+
+// Distance fog measured from the viewer, independent of the world's own fog
+// settings - avatars can't change those, and the horror look needs the fog to
+// close in far tighter than any world would.
+inline half DNRHorrorFog(float3 worldPos)
+{
+    float d = distance(_WorldSpaceCameraPos, worldPos);
+    half t = saturate((d - _HorrorFogStart) / max(_HorrorFogEnd - _HorrorFogStart, 0.001));
+    return t * _HorrorFogDensity;
+}
+
+// Surface-stage grade: crush the blacks, lift them back toward grey for that
+// washed VHS muddiness, tint, then bury it all in fog.
+inline fixed3 DNRHorrorGrade(fixed3 col, float3 worldPos)
+{
+    col = saturate((col - _HorrorCrush) / max(1.0 - _HorrorCrush, 0.001));
+    col = _HorrorLift + col * (1.0 - _HorrorLift);
+    col *= _HorrorTint.rgb;
+    return lerp(col, _HorrorFogColor.rgb, DNRHorrorFog(worldPos));
+}
+
+// Film/lens stage: grain and vignette, applied after the "hardware" stages so
+// they read as the camera rather than the console.
+inline fixed3 DNRHorrorFilm(fixed3 col, float2 pixelPos)
+{
+    if (_GrainStrength > 0.0001)
+    {
+        float2 gp = floor(pixelPos / max(_GrainSize, 1.0));
+        // Advancing in discrete steps gives 24fps film flicker instead of a
+        // smooth crawl that reads as noise.
+        gp += (_GrainAnimate > 0.5) ? floor(_Time.y * 24.0) * 17.0 : 0.0;
+        col += (DNRHash21(gp) - 0.5) * _GrainStrength;
+    }
+    if (_VignetteStrength > 0.0001)
+    {
+        float2 v = pixelPos / max(_ScreenParams.xy, float2(1.0, 1.0)) - 0.5;
+        half r = length(v) * 1.41421356;
+        half mask = smoothstep(1.0, 1.0 - max(_VignetteSoftness, 0.01), r);
+        col *= lerp(1.0, mask, _VignetteStrength);
+    }
+    return saturate(col);
+}
+#endif
+
+#if defined(_DNR_GRUNGEMAP)
+// Dirt/grime layer over the albedo, either following the mesh UVs or projected
+// in screen space like muck on the camera lens.
+inline fixed3 DNRApplyGrunge(fixed3 albedo, float2 uv, float2 pixelPos)
+{
+    float2 guv = (_GrungeScreenSpace > 0.5)
+        ? pixelPos / max(_ScreenParams.xy, float2(1.0, 1.0))
+        : uv;
+    guv = guv * _GrungeMap_ST.xy + _GrungeMap_ST.zw;
+
+    fixed3 g = DNRSampleTex(_GrungeMap, guv).rgb;
+    fixed3 lo = 2.0 * albedo * g;
+    fixed3 hi = 1.0 - 2.0 * (1.0 - albedo) * (1.0 - g);
+    fixed3 blended = (_GrungeBlend > 0.5) ? lerp(lo, hi, step(0.5, albedo)) : albedo * g;
+    return lerp(albedo, blended, _GrungeStrength);
 }
 #endif
 
@@ -340,6 +432,10 @@ fixed4 DNRFrag(v2f i) : SV_Target
     albedo *= i.vColor;
 #endif
 
+#if defined(_DNR_GRUNGEMAP)
+    albedo.rgb = DNRApplyGrunge(albedo.rgb, uv, i.pos.xy);
+#endif
+
     albedo.a = DNRApplyAlphaMask(albedo.a, uv);
 
 #if defined(_ALPHATEST_ON)
@@ -387,12 +483,25 @@ fixed4 DNRFrag(v2f i) : SV_Target
     col = DNRColorGrade(col);
 #endif
 
+#if defined(_DNR_HORROR)
+    #if defined(UNITY_PASS_FORWARDADD)
+        // Extra lights have to fade into the fog too, or they punch through it.
+        col *= 1.0 - DNRHorrorFog(i.worldPos);
+    #else
+        col = DNRHorrorGrade(col, i.worldPos);
+    #endif
+#endif
+
 #if defined(_DNR_POSTERIZE)
     col = DNRPosterize(col, i.pos.xy);
 #endif
 
 #if defined(_DNR_DOTCRAWL) && defined(UNITY_PASS_FORWARDBASE)
     col = DNRDotCrawl(col, i.pos.xy, i.worldNormal, i.worldPos);
+#endif
+
+#if defined(_DNR_HORROR) && defined(UNITY_PASS_FORWARDBASE)
+    col = DNRHorrorFilm(col, i.pos.xy);
 #endif
 
 #if defined(_DNR_SCANLINES)

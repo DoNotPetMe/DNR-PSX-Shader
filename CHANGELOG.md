@@ -4,6 +4,27 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-09
+
+### Added
+- **Survival Horror grade** (`_DNR_HORROR`), recreating the PS1 horror look:
+  - Per-material distance fog with color, start, end and density. Independent of the world's
+    fog settings, which avatars cannot change - and the horror look needs fog far tighter than
+    any social world uses. Additive lights fade into it too, so they don't punch through.
+  - Animated film grain that steps at 24fps for a film flicker, with adjustable cell size, or
+    static for a dirty-lens look.
+  - Vignette with adjustable strength and softness.
+  - Black crush and black lift for crushed or faded-tape palettes, plus a grade tint.
+- **Grunge overlay** (`_DNR_GRUNGEMAP`): a user-supplied dirt/rust/noise texture layered over
+  the albedo with multiply or overlay blending, following the mesh UVs or projected in screen
+  space like muck on the camera lens.
+- **Built-in presets** - Authentic PS1, Survival Horror, Foggy Nightmare and Clean Retro -
+  available as one-click buttons in both the material inspector (applies to all selected
+  materials, undoable) and the setup window's global preset. Each preset resets from a common
+  baseline, so switching never leaves a stray effect enabled from the previous style.
+- Global look settings gained a "Horror" group, which propagates its colors and the grunge
+  texture (with tiling) alongside the numeric settings.
+
 ## [1.6.0] - 2026-08-09
 
 ### Added
