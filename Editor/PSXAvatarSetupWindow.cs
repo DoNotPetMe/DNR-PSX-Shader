@@ -34,6 +34,7 @@ namespace DNR.PSX.Editor
         [SerializeField] string parameterName = "PSXShader";
         [SerializeField] string controlName = "PSX Shader";
         [SerializeField] bool psxApplied;
+        [SerializeField] bool fixTextureImports = true;
         [SerializeField] List<string> selectedRadials = new List<string>();
 #if DNR_VRC_AVATARS
         [SerializeField] VRCExpressionsMenu targetMenu;
@@ -168,6 +169,13 @@ namespace DNR.PSX.Editor
             int generated = entries.Where(e => e.include).SelectMany(e => e.psx).Count(m => m != null);
             if (generated > 0)
                 EditorGUILayout.LabelField($"Generated materials ready: {generated}", EditorStyles.miniLabel);
+
+            fixTextureImports = EditorGUILayout.ToggleLeft(
+                new GUIContent("Fix texture alpha import settings",
+                    "For see-through materials, enables 'Alpha Is Transparency' (and the alpha channel itself) " +
+                    "on the source textures. This is what removes black halos around eyelashes and hair. " +
+                    "Changes are listed in the report and the Console."),
+                fixTextureImports);
 
             if (GUILayout.Button(generated > 0 ? "Regenerate PSX Materials" : "Generate PSX Materials", GUILayout.Height(28)))
                 GenerateMaterials();
@@ -330,6 +338,7 @@ namespace DNR.PSX.Editor
             {
                 var cache = new Dictionary<Material, Material>();
                 var usedPaths = new HashSet<string>();
+                var log = new ConversionLog();
                 int count = 0;
 
                 foreach (var entry in entries.Where(e => e.include && e.renderer != null))
@@ -350,7 +359,8 @@ namespace DNR.PSX.Editor
                         {
                             if (!cache.TryGetValue(source, out var converted))
                             {
-                                converted = PSXMaterialConverter.Convert(source, outputFolder, usedPaths);
+                                converted = PSXMaterialConverter.Convert(
+                                    source, outputFolder, usedPaths, log, fixTextureImports);
                                 cache[source] = converted;
                                 count++;
                             }
@@ -361,7 +371,7 @@ namespace DNR.PSX.Editor
 
                 AssetDatabase.SaveAssets();
 
-                Debug.Log($"[DNR PSX] Generated/updated {count} PSX material{(count == 1 ? "" : "s")} in {outputFolder}.");
+                ReportConversion(count, log);
                 var folderAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(outputFolder);
                 if (folderAsset != null)
                     EditorGUIUtility.PingObject(folderAsset);
@@ -370,6 +380,46 @@ namespace DNR.PSX.Editor
             {
                 EditorUtility.DisplayDialog("PSX Material Generation Failed", e.Message, "OK");
                 Debug.LogException(e);
+            }
+        }
+
+        /// <summary>
+        /// Surfaces conversion notes where the user will actually see them: the
+        /// Console gets everything, a dialog gets anything needing attention.
+        /// </summary>
+        void ReportConversion(int count, ConversionLog log)
+        {
+            var attention = log.warnings.Where(w => !w.StartsWith("[info]")).ToList();
+            var info = log.warnings.Where(w => w.StartsWith("[info]")).ToList();
+
+            var console = new System.Text.StringBuilder();
+            console.AppendLine($"[DNR PSX] Generated/updated {count} PSX material{(count == 1 ? "" : "s")} in {outputFolder}.");
+            if (log.textureFixes.Count > 0)
+                console.AppendLine($"Enabled alpha transparency on {log.textureFixes.Count} texture(s): " +
+                                   string.Join(", ", log.textureFixes));
+            foreach (string line in info) console.AppendLine(line);
+            foreach (string line in attention) console.AppendLine("WARNING: " + line);
+            Debug.Log(console.ToString().TrimEnd());
+
+            var dialog = new System.Text.StringBuilder();
+            dialog.AppendLine($"Converted {count} material{(count == 1 ? "" : "s")}.");
+            if (log.textureFixes.Count > 0)
+                dialog.AppendLine($"\nFixed alpha import settings on {log.textureFixes.Count} texture(s) " +
+                                  "so transparent edges don't render black.");
+
+            if (attention.Count > 0)
+            {
+                dialog.AppendLine("\nNeeds a look:");
+                foreach (string line in attention.Take(6))
+                    dialog.AppendLine("• " + line);
+                if (attention.Count > 6)
+                    dialog.AppendLine($"• ...and {attention.Count - 6} more (see the Console).");
+                EditorUtility.DisplayDialog("PSX Materials", dialog.ToString(), "OK");
+            }
+            else
+            {
+                dialog.Append("\nNo transparency problems detected.");
+                EditorUtility.DisplayDialog("PSX Materials", dialog.ToString(), "Nice");
             }
         }
 

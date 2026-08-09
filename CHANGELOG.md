@@ -4,6 +4,36 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-08-09
+
+### Added
+- **Alpha mask support** in the shader: a second texture (with channel select, invert, and
+  multiply/replace modes) drives transparency, matching how Poiyomi and lilToon author
+  eyelashes, hair cards and decals. Applied in the shadow caster too, so cutout shadows agree
+  with the visible surface.
+- **Alpha To Coverage** (`AlphaToMask`) for MSAA-smoothed cutout edges without sorting issues.
+- **Premultiplied alpha** option for blended surfaces, removing dark halos where a texture's
+  invisible texels are black.
+- New "Transparency" section in the material inspector, with guidance when the current
+  rendering mode makes alpha a no-op.
+- Conversion report (dialog + Console) listing detected modes, textures repaired, and any
+  material converted as Opaque whose texture still has an alpha channel.
+
+### Fixed
+- **Poiyomi materials converted as fully opaque, rendering eyelashes and hair as black
+  shapes.** The converter now understands Poiyomi Toon and Poiyomi Pro (locked or unlocked):
+  it reads the `_Mode`/`_RenderingPreset` preset, Alpha To Coverage flags, alpha mask
+  textures, and tint alpha instead of trusting `RenderType`/queue alone - Poiyomi's default
+  Opaque preset is routinely used *with* alpha, which is what produced the black shapes.
+- Culling is now carried over, so Poiyomi's double-sided hair, eyelashes and skirts no longer
+  lose a side.
+- Emission now respects `_EnableEmission` and `_EmissionStrength` (Poiyomi) alongside the
+  Standard `_EMISSION` keyword, and lilToon's `_UseEmission`.
+- Deliberate render queues are preserved for cutout and transparent materials.
+- Source textures whose importer has "Alpha Is Transparency" (or the alpha channel itself)
+  disabled are repaired for see-through materials, removing black halos on transparent edges.
+  Opt out with the checkbox in the setup window.
+
 ## [1.4.0] - 2026-08-07
 
 ### Added

@@ -20,6 +20,15 @@ Shader "DNR/PSX"
         _Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.5
         [Toggle(_DNR_VERTEXCOLOR)] _VertexColor ("Use Vertex Colors", Float) = 0
 
+        // ------------------------------------------------------- transparency
+        [Toggle(_DNR_ALPHAMASK)] _AlphaMaskEnabled ("Use Alpha Mask", Float) = 0
+        _AlphaMask ("Alpha Mask", 2D) = "white" {}
+        [Enum(R,0,G,1,B,2,A,3)] _AlphaMaskChannel ("Alpha Mask Channel", Float) = 0
+        [Toggle] _AlphaMaskInvert ("Invert Alpha Mask", Float) = 0
+        [Enum(Multiply,0,Replace,1)] _AlphaMaskMode ("Alpha Mask Mode", Float) = 0
+        [Toggle] _AlphaToMask ("Alpha To Coverage", Float) = 0
+        [Toggle(_DNR_PREMULTIPLY)] _Premultiply ("Premultiplied Alpha", Float) = 0
+
         [Toggle(_EMISSION)] _EmissionEnabled ("Enable Emission", Float) = 0
         _EmissionMap ("Emission Map", 2D) = "white" {}
         [HDR] _EmissionColor ("Emission Color", Color) = (0, 0, 0, 1)
@@ -89,6 +98,7 @@ Shader "DNR/PSX"
             Tags { "LightMode" = "ForwardBase" }
             Blend [_SrcBlend] [_DstBlend]
             ZWrite [_ZWrite]
+            AlphaToMask [_AlphaToMask]
 
             CGPROGRAM
             #pragma vertex DNRVert
@@ -112,6 +122,8 @@ Shader "DNR/PSX"
             #pragma shader_feature_local _DNR_DOTCRAWL
             #pragma shader_feature_local _ALPHATEST_ON
             #pragma shader_feature_local _ALPHABLEND_ON
+            #pragma shader_feature_local _DNR_ALPHAMASK
+            #pragma shader_feature_local _DNR_PREMULTIPLY
 
             #include "Includes/DNRPSXCore.cginc"
             ENDCG
@@ -170,6 +182,7 @@ Shader "DNR/PSX"
 
             #pragma shader_feature_local _ALPHATEST_ON
             #pragma shader_feature_local _ALPHABLEND_ON
+            #pragma shader_feature_local _DNR_ALPHAMASK
 
             #include "Includes/DNRPSXCore.cginc"
             ENDCG

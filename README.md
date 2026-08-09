@@ -37,8 +37,10 @@ your avatar's normal look and the PSX look.
 **Tool — `Tools ▸ DNR PSX ▸ Avatar Setup`**
 
 - Scans your avatar, lets you pick which renderers to convert.
-- Generates PSX materials from your existing ones (Standard, lilToon, etc. — carries over main
-  texture, tint, emission, cutoff, and render mode). **Your original materials are never touched.**
+- Generates PSX materials from your existing ones. **Your original materials are never touched.**
+  It understands the property conventions of **Poiyomi Toon, Poiyomi Pro** (locked or unlocked),
+  **lilToon** and **Standard**, carrying over main texture, tint, cutoff, alpha masks, emission
+  (including emission strength), culling, render queue and transparency mode.
 - One-click preview on the avatar, with one-click restore.
 - **Builds the complete in-game toggle**: two animation clips (original ↔ PSX material swaps),
   an FX animator layer, a synced + saved Expression Parameter, and an Action Menu toggle.
@@ -94,6 +96,9 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
 | — | Rendering Mode | Opaque / Cutout / Transparent. Sets blending, queue, and VRC fallback automatically. |
 | Surface | Albedo / Color | Main texture and tint. |
 | Surface | Use Vertex Colors | Multiplies albedo by mesh vertex colors (PS1 models used these heavily). |
+| Transparency | Use Alpha Mask | Take transparency from a separate mask texture (channel + invert + multiply/replace), like Poiyomi and lilToon do for eyelashes and hair. |
+| Transparency | Alpha To Coverage | MSAA-smoothed cutout edges — the best option for eyelashes and hair, with no sorting problems. |
+| Transparency | Premultiplied Alpha | Removes dark halos on blended edges whose texture is black behind the transparency. |
 | Surface | Emission | Emission map + HDR color, added on top of lighting. |
 | PSX Effects | Vertex Snap | Strength of the vertex-grid snapping (0 = off). |
 | PSX Effects | Snap Resolution | Vertical resolution of the virtual framebuffer. 240 is authentic; lower = wobblier. |
@@ -154,6 +159,18 @@ Quest users will see your Quest version / fallback as usual.
 **The toggle does nothing in game.**
 Make sure you re-uploaded after building the toggle, and that you didn't rename the parameter in
 the FX controller without rebuilding. Rebuilding the toggle is always safe.
+
+**My eyelashes / hair render as black shapes instead of being see-through.**
+This is the classic Poiyomi conversion trap and the converter now handles it automatically —
+regenerate your materials to pick up the fix. Poiyomi's *default* preset is Opaque with Alpha
+To Coverage doing the cutout work, so the material reports `RenderType=Opaque` at queue 2000
+even though it is really a cutout; older versions of this tool believed it and threw the alpha
+away, leaving the black area of the texture visible. The converter now also reads Poiyomi's
+`_Mode` preset, alpha mask textures, Alpha To Coverage flags, tint alpha, and culling, and it
+repairs source textures whose importer has "Alpha Is Transparency" turned off (the cause of
+black *halos* rather than black shapes). If one material still comes out wrong, just set its
+**Rendering Mode** to Cutout on the generated material — the conversion report lists any
+material it converted as Opaque whose texture has an alpha channel.
 
 **Force Point Filtering looks like it does nothing.**
 It only shows when texture pixels are larger than screen pixels — a low-res texture viewed up

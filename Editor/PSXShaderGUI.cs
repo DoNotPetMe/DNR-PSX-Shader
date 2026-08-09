@@ -20,10 +20,12 @@ namespace DNR.PSX.Editor
             Transparent = 2
         }
 
-        public const string Version = "1.4.0";
+        public const string Version = "1.5.0";
 
         // ------------------------------------------------------------ state
         MaterialProperty _mode, _mainTex, _color, _cutoff, _vertexColor;
+        MaterialProperty _alphaMaskEnabled, _alphaMask, _alphaMaskChannel, _alphaMaskInvert, _alphaMaskMode;
+        MaterialProperty _alphaToMask, _premultiply;
         MaterialProperty _emissionEnabled, _emissionMap, _emissionColor;
         MaterialProperty _snapStrength, _snapResolution, _affineStrength;
         MaterialProperty _pixelate, _pixelResolution, _pointFilter, _noMips;
@@ -36,6 +38,7 @@ namespace DNR.PSX.Editor
         MaterialProperty _cull;
 
         static bool foldSurface = true;
+        static bool foldTransparency;
         static bool foldPSX = true;
         static bool foldColorCRT = true;
         static bool foldLighting = true;
@@ -58,6 +61,10 @@ namespace DNR.PSX.Editor
             foldSurface = Foldout(foldSurface, "Surface");
             if (foldSurface)
                 DrawSurface(editor);
+
+            foldTransparency = Foldout(foldTransparency, "Transparency");
+            if (foldTransparency)
+                DrawTransparency(editor);
 
             foldPSX = Foldout(foldPSX, "PSX Effects");
             if (foldPSX)
@@ -83,6 +90,13 @@ namespace DNR.PSX.Editor
             _color           = FindProperty("_Color", props);
             _cutoff          = FindProperty("_Cutoff", props);
             _vertexColor     = FindProperty("_VertexColor", props);
+            _alphaMaskEnabled = FindProperty("_AlphaMaskEnabled", props);
+            _alphaMask        = FindProperty("_AlphaMask", props);
+            _alphaMaskChannel = FindProperty("_AlphaMaskChannel", props);
+            _alphaMaskInvert  = FindProperty("_AlphaMaskInvert", props);
+            _alphaMaskMode    = FindProperty("_AlphaMaskMode", props);
+            _alphaToMask      = FindProperty("_AlphaToMask", props);
+            _premultiply      = FindProperty("_Premultiply", props);
             _emissionEnabled = FindProperty("_EmissionEnabled", props);
             _emissionMap     = FindProperty("_EmissionMap", props);
             _emissionColor   = FindProperty("_EmissionColor", props);
@@ -160,6 +174,51 @@ namespace DNR.PSX.Editor
             {
                 editor.TexturePropertySingleLine(EmissionLabel, _emissionMap, _emissionColor);
             }
+            EditorGUI.indentLevel--;
+        }
+
+        void DrawTransparency(MaterialEditor editor)
+        {
+            EditorGUI.indentLevel++;
+            var mode = (RenderMode)_mode.floatValue;
+
+            if (mode == RenderMode.Opaque)
+                EditorGUILayout.HelpBox(
+                    "Rendering Mode is Opaque, so alpha is ignored entirely. If this material should be " +
+                    "see-through (eyelashes, hair cards, decals), switch to Cutout or Transparent above.",
+                    MessageType.Info);
+
+            editor.ShaderProperty(_alphaMaskEnabled, new GUIContent("Use Alpha Mask",
+                "Take transparency from a separate mask texture instead of (or on top of) the albedo's alpha. " +
+                "Poiyomi and lilToon use this for eyelashes and hair."));
+            if (_alphaMaskEnabled.floatValue > 0.5f)
+            {
+                editor.TexturePropertySingleLine(new GUIContent("Alpha Mask"), _alphaMask);
+                editor.ShaderProperty(_alphaMaskChannel, "Channel");
+                editor.ShaderProperty(_alphaMaskInvert, "Invert");
+                editor.ShaderProperty(_alphaMaskMode, new GUIContent("Mode",
+                    "Multiply: mask scales the albedo's alpha. Replace: mask becomes the alpha."));
+            }
+
+            EditorGUILayout.Space(4);
+            EditorGUI.BeginChangeCheck();
+            editor.ShaderProperty(_alphaToMask, new GUIContent("Alpha To Coverage",
+                "Smooths hard cutout edges using MSAA coverage. Great for eyelashes and hair in VR, " +
+                "and unlike Transparent mode it needs no sorting. Best used with Cutout."));
+            editor.ShaderProperty(_premultiply, new GUIContent("Premultiplied Alpha",
+                "Fixes dark halos around transparent edges when the texture's invisible areas are black. " +
+                "Transparent mode only."));
+            if (EditorGUI.EndChangeCheck())
+            {
+                foreach (Material mat in editor.targets)
+                    ApplyRenderMode(mat, (RenderMode)mat.GetFloat("_Mode"));
+            }
+
+            if (mode == RenderMode.Transparent)
+                EditorGUILayout.HelpBox(
+                    "Transparent surfaces don't write depth, so overlapping parts of the same mesh can sort " +
+                    "incorrectly. For eyelashes and hair, Cutout + Alpha To Coverage usually looks better.",
+                    MessageType.None);
             EditorGUI.indentLevel--;
         }
 
@@ -320,9 +379,12 @@ namespace DNR.PSX.Editor
                     break;
 
                 case RenderMode.Transparent:
+                    // Premultiplied alpha uses SrcBlend One, since the shader
+                    // has already multiplied color by alpha.
+                    bool premultiplied = mat.HasProperty("_Premultiply") && mat.GetFloat("_Premultiply") > 0.5f;
                     mat.SetOverrideTag("RenderType", "Transparent");
                     mat.SetOverrideTag("VRCFallback", "ToonTransparent");
-                    mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                    mat.SetFloat("_SrcBlend", (float)(premultiplied ? BlendMode.One : BlendMode.SrcAlpha));
                     mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
                     mat.SetFloat("_ZWrite", 0f);
                     mat.DisableKeyword("_ALPHATEST_ON");
@@ -346,6 +408,8 @@ namespace DNR.PSX.Editor
             SetKeyword(mat, "_DNR_COLORGRADE", mat.GetFloat("_ColorGrade") > 0.5f);
             SetKeyword(mat, "_DNR_SCANLINES", mat.GetFloat("_Scanlines") > 0.5f);
             SetKeyword(mat, "_DNR_DOTCRAWL", mat.GetFloat("_DotCrawl") > 0.5f);
+            SetKeyword(mat, "_DNR_ALPHAMASK", mat.GetFloat("_AlphaMaskEnabled") > 0.5f);
+            SetKeyword(mat, "_DNR_PREMULTIPLY", mat.GetFloat("_Premultiply") > 0.5f);
 
             int lighting = Mathf.RoundToInt(mat.GetFloat("_Lighting"));
             SetKeyword(mat, "_LIGHTING_VERTEX", lighting == 0);

@@ -25,6 +25,15 @@ float4    _MainTex_TexelSize;
 fixed4    _Color;
 fixed     _Cutoff;
 
+// Alpha mask: a second texture whose channel drives (or replaces) alpha.
+// Poiyomi and lilToon both use this for eyelashes, hair cards and decals,
+// where the albedo's own alpha is not the transparency source.
+sampler2D _AlphaMask;
+float4    _AlphaMask_TexelSize;
+half      _AlphaMaskChannel; // 0=R 1=G 2=B 3=A
+half      _AlphaMaskInvert;
+half      _AlphaMaskMode;    // 0=Multiply 1=Replace
+
 sampler2D _EmissionMap;
 float4    _EmissionMap_TexelSize;
 half4     _EmissionColor;
@@ -117,6 +126,20 @@ inline fixed4 DNRSampleTex(sampler2D tex, float2 uv)
 #else
     return tex2D(tex, uv);
 #endif
+}
+
+// Applies the alpha mask, if one is enabled. Shared by the forward and
+// shadow-caster programs so cutouts and their shadows always agree.
+inline fixed DNRApplyAlphaMask(fixed alpha, float2 uv)
+{
+#if defined(_DNR_ALPHAMASK)
+    fixed4 m = DNRSampleTex(_AlphaMask, DNRPointFilterUV(uv, _AlphaMask_TexelSize));
+    int idx = (int)round(_AlphaMaskChannel);
+    fixed v = (idx == 0) ? m.r : ((idx == 1) ? m.g : ((idx == 2) ? m.b : m.a));
+    if (_AlphaMaskInvert > 0.5) v = 1.0 - v;
+    alpha = (_AlphaMaskMode > 0.5) ? v : alpha * v;
+#endif
+    return alpha;
 }
 
 #if defined(_DNR_DOTCRAWL)
@@ -317,6 +340,8 @@ fixed4 DNRFrag(v2f i) : SV_Target
     albedo *= i.vColor;
 #endif
 
+    albedo.a = DNRApplyAlphaMask(albedo.a, uv);
+
 #if defined(_ALPHATEST_ON)
     clip(albedo.a - _Cutoff);
 #endif
@@ -378,7 +403,14 @@ fixed4 DNRFrag(v2f i) : SV_Target
 #endif
 
     fixed alpha = albedo.a;
-#if !defined(_ALPHABLEND_ON)
+#if defined(_ALPHABLEND_ON)
+    #if defined(_DNR_PREMULTIPLY)
+        // Premultiplied alpha (SrcBlend One): kills the dark halo you get
+        // when a texture's transparent texels are black and bilinear
+        // filtering bleeds them into the visible edge.
+        col *= alpha;
+    #endif
+#else
     alpha = 1.0;
 #endif
 
@@ -417,12 +449,13 @@ v2fShadow DNRVertShadow(appdata v)
 
 fixed4 DNRFragShadow(v2fShadow i) : SV_Target
 {
-#if defined(_ALPHATEST_ON)
-    fixed a = tex2D(_MainTex, i.uv).a * _Color.a;
-    clip(a - _Cutoff);
-#elif defined(_ALPHABLEND_ON)
-    fixed a = tex2D(_MainTex, i.uv).a * _Color.a;
-    clip(a - 0.5); // blended surfaces cast shadow only where mostly opaque
+#if defined(_ALPHATEST_ON) || defined(_ALPHABLEND_ON)
+    fixed a = DNRApplyAlphaMask(tex2D(_MainTex, i.uv).a * _Color.a, i.uv);
+    #if defined(_ALPHATEST_ON)
+        clip(a - _Cutoff);
+    #else
+        clip(a - 0.5); // blended surfaces cast shadow only where mostly opaque
+    #endif
 #endif
     SHADOW_CASTER_FRAGMENT(i)
 }
