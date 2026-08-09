@@ -45,6 +45,11 @@ your avatar's normal look and the PSX look.
 - **Builds the complete in-game toggle**: two animation clips (original ↔ PSX material swaps),
   an FX animator layer, a synced + saved Expression Parameter, and an Action Menu toggle.
   Re-running the tool updates everything in place instead of duplicating it.
+- **Global look (optional)**: edit one preset material and push its PSX style to every PSX
+  material on the avatar in one click, so all meshes match. Each mesh keeps its own textures,
+  tint, transparency and culling. Choose which groups travel (PSX / Color & CRT / Lighting),
+  pull the current look back into the preset, or enable live sync to propagate every edit
+  as you make it.
 - **In-game setting radials (optional)**: pick from 8 shader settings — Vertex Snap, Affine
   Warp, Pixelation, Color Crush, Dither, Scanlines, Dot Crawl, Hue Shift — and the tool builds
   synced radial sliders in a "PSX Settings" Action Menu submenu so you can tune the look live
@@ -82,6 +87,9 @@ in any Built-in Render Pipeline project; only the toggle builder needs the SDK.
    **PSX Shader** toggle in your Action Menu in game.
 6. **Step 4 (optional)** — tick the settings you want adjustable in game and click
    **Build Setting Radials**. They appear in a **PSX Settings** submenu as radial sliders.
+7. **Step 5 (optional)** — click **Create Preset From Current Look**, dial in the style once,
+   then **Apply To N Materials** so every mesh shares it. Tick **Live sync** to have edits
+   propagate as you make them.
 
 > The toggle's default (OFF) state is your original materials, so your avatar looks unchanged
 > until you switch it on. The parameter is synced (everyone sees it) and saved (persists between
@@ -201,7 +209,8 @@ Shaders/
   Includes/DNRPSXCore.cginc  Shared vertex/fragment programs + PSX helpers
 Editor/
   PSXShaderGUI.cs         Custom material inspector
-  PSXMaterialConverter.cs Material conversion (GUID-preserving updates)
+  PSXMaterialConverter.cs Material conversion (Poiyomi/lilToon aware)
+  PSXGlobalSettings.cs    Shared-look propagation across materials
   PSXToggleBuilder.cs     FX layer / parameters / menu builder (needs VRC SDK)
   PSXAvatarSetupWindow.cs The setup window (Tools ▸ DNR PSX ▸ Avatar Setup)
 ```

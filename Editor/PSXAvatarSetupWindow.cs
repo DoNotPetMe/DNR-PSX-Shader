@@ -36,6 +36,15 @@ namespace DNR.PSX.Editor
         [SerializeField] bool psxApplied;
         [SerializeField] bool fixTextureImports = true;
         [SerializeField] List<string> selectedRadials = new List<string>();
+        [SerializeField] Material globalPreset;
+        [SerializeField] bool globalEffects = true;
+        [SerializeField] bool globalColor = true;
+        [SerializeField] bool globalLighting = true;
+        [SerializeField] bool globalIncludeFolder;
+        [SerializeField] bool globalLiveSync;
+
+        MaterialEditor presetEditor;
+        int presetFingerprint;
 #if DNR_VRC_AVATARS
         [SerializeField] VRCExpressionsMenu targetMenu;
 #endif
@@ -78,6 +87,7 @@ namespace DNR.PSX.Editor
             DrawMaterialSection();
             DrawToggleSection();
             DrawRadialsSection();
+            DrawGlobalSection();
             EditorGUILayout.EndScrollView();
         }
 
@@ -288,6 +298,198 @@ namespace DNR.PSX.Editor
             EditorGUILayout.HelpBox(
                 "Requires the VRChat Avatars SDK (see step 3).", MessageType.None);
 #endif
+        }
+
+        // ------------------------------------------------------- global look
+        void DrawGlobalSection()
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("5. Global Look (Optional)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Dial in the PSX look once and push it to every PSX material on the avatar, so all meshes " +
+                "match. Each mesh keeps its own textures, tint, transparency and culling — only the " +
+                "stylistic settings are shared.", MessageType.None);
+
+            // Adopt an existing preset in the output folder without asking.
+            if (globalPreset == null && !string.IsNullOrEmpty(outputFolder))
+                globalPreset = AssetDatabase.LoadAssetAtPath<Material>(outputFolder + "/PSX Global Settings.mat");
+
+            EditorGUI.BeginChangeCheck();
+            globalPreset = (Material)EditorGUILayout.ObjectField(
+                new GUIContent("Preset Material", "The material whose look settings get copied to all the others."),
+                globalPreset, typeof(Material), false);
+            if (EditorGUI.EndChangeCheck())
+                DestroyPresetEditor();
+
+            var targets = CollectPSXMaterials();
+
+            if (globalPreset == null)
+            {
+                using (new EditorGUI.DisabledScope(targets.Count == 0))
+                {
+                    if (GUILayout.Button("Create Preset From Current Look", GUILayout.Height(24)))
+                        CreatePreset(targets.Count > 0 ? targets[0] : null);
+                }
+                if (targets.Count == 0)
+                    EditorGUILayout.LabelField("Generate PSX materials first.", EditorStyles.miniLabel);
+                return;
+            }
+
+            if (!PSXGlobalSettings.IsPSXMaterial(globalPreset))
+            {
+                EditorGUILayout.HelpBox("The preset material must use the DNR/PSX shader.", MessageType.Warning);
+                return;
+            }
+
+            // Which groups travel.
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Apply Groups", GUILayout.Width(EditorGUIUtility.labelWidth - 2));
+                globalEffects = GUILayout.Toggle(globalEffects, "PSX", EditorStyles.miniButtonLeft);
+                globalColor = GUILayout.Toggle(globalColor, "Color/CRT", EditorStyles.miniButtonMid);
+                globalLighting = GUILayout.Toggle(globalLighting, "Lighting", EditorStyles.miniButtonRight);
+            }
+
+            globalIncludeFolder = EditorGUILayout.ToggleLeft(
+                new GUIContent("Include every PSX material in the output folder",
+                    "Also covers PSX materials that aren't currently on this avatar's renderers."),
+                globalIncludeFolder);
+
+            EditorGUI.BeginChangeCheck();
+            globalLiveSync = EditorGUILayout.ToggleLeft(
+                new GUIContent("Live sync while this window is open",
+                    "Push every edit to the preset out to the other materials automatically."),
+                globalLiveSync);
+            if (EditorGUI.EndChangeCheck() && globalLiveSync)
+                presetFingerprint = CurrentFingerprint();
+
+            // The preset is edited through the real material inspector, so the
+            // tool never drifts out of sync with the shader's own UI.
+            if (presetEditor == null || presetEditor.target != globalPreset)
+            {
+                DestroyPresetEditor();
+                presetEditor = (MaterialEditor)UnityEditor.Editor.CreateEditor(globalPreset);
+            }
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                presetEditor.PropertiesGUI();
+
+            using (new EditorGUI.DisabledScope(targets.Count == 0))
+            {
+                if (GUILayout.Button($"Apply To {targets.Count} Material{(targets.Count == 1 ? "" : "s")}", GUILayout.Height(30)))
+                    ApplyGlobal(targets, verbose: true);
+            }
+            if (GUILayout.Button("Pull Settings From Avatar Into Preset"))
+                PullIntoPreset(targets);
+
+            if (globalLiveSync)
+            {
+                int fingerprint = CurrentFingerprint();
+                if (fingerprint != presetFingerprint)
+                {
+                    presetFingerprint = fingerprint;
+                    ApplyGlobal(targets, verbose: false);
+                }
+            }
+        }
+
+        int CurrentFingerprint()
+        {
+            return PSXGlobalSettings.Fingerprint(globalPreset, globalEffects, globalColor, globalLighting);
+        }
+
+        /// <summary>Every PSX material this window should keep in sync.</summary>
+        List<Material> CollectPSXMaterials()
+        {
+            var result = new List<Material>();
+            void Add(Material mat)
+            {
+                if (PSXGlobalSettings.IsPSXMaterial(mat) && mat != globalPreset && !result.Contains(mat))
+                    result.Add(mat);
+            }
+
+            foreach (var entry in entries.Where(e => e.include && e.renderer != null))
+            {
+                foreach (var mat in entry.psx) Add(mat);
+                foreach (var mat in entry.renderer.sharedMaterials) Add(mat);
+            }
+
+            if (globalIncludeFolder && AssetDatabase.IsValidFolder(outputFolder))
+            {
+                foreach (string guid in AssetDatabase.FindAssets("t:Material", new[] { outputFolder }))
+                    Add(AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid)));
+            }
+            return result;
+        }
+
+        void CreatePreset(Material seed)
+        {
+            try
+            {
+                globalPreset = PSXGlobalSettings.CreatePreset(outputFolder, seed);
+                DestroyPresetEditor();
+                presetFingerprint = CurrentFingerprint();
+                EditorGUIUtility.PingObject(globalPreset);
+            }
+            catch (Exception e)
+            {
+                EditorUtility.DisplayDialog("Preset Creation Failed", e.Message, "OK");
+                Debug.LogException(e);
+            }
+        }
+
+        void ApplyGlobal(List<Material> targets, bool verbose)
+        {
+            try
+            {
+                int count = PSXGlobalSettings.Apply(globalPreset, targets, globalEffects, globalColor, globalLighting);
+                if (verbose)
+                {
+                    EditorUtility.DisplayDialog("PSX Global Look",
+                        count == 0
+                            ? "No PSX materials to update."
+                            : $"Applied the preset's look to {count} material{(count == 1 ? "" : "s")}.",
+                        "OK");
+                }
+                if (count > 0)
+                    Debug.Log($"[DNR PSX] Applied global look settings to {count} material(s).");
+            }
+            catch (Exception e)
+            {
+                EditorUtility.DisplayDialog("Apply Failed", e.Message, "OK");
+                Debug.LogException(e);
+            }
+        }
+
+        void PullIntoPreset(List<Material> targets)
+        {
+            if (targets.Count == 0)
+            {
+                EditorUtility.DisplayDialog("Nothing To Pull", "No PSX materials found on this avatar.", "OK");
+                return;
+            }
+            Undo.RecordObject(globalPreset, "Pull PSX Settings");
+            foreach (string property in PSXGlobalSettings.Gather(true, true, true))
+                if (targets[0].HasProperty(property) && globalPreset.HasProperty(property))
+                    globalPreset.SetFloat(property, targets[0].GetFloat(property));
+            PSXShaderGUI.ValidateKeywords(globalPreset);
+            EditorUtility.SetDirty(globalPreset);
+            AssetDatabase.SaveAssets();
+            presetFingerprint = CurrentFingerprint();
+            Debug.Log($"[DNR PSX] Pulled look settings from \"{targets[0].name}\" into the preset.");
+        }
+
+        void DestroyPresetEditor()
+        {
+            if (presetEditor != null)
+            {
+                UnityEngine.Object.DestroyImmediate(presetEditor);
+                presetEditor = null;
+            }
+        }
+
+        void OnDisable()
+        {
+            DestroyPresetEditor();
         }
 
         // ------------------------------------------------------------ actions

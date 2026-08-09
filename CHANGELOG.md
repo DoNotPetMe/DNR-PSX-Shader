@@ -4,6 +4,22 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-08-09
+
+### Added
+- **Global look settings** (step 5 in the setup window): a preset material whose stylistic
+  settings can be pushed to every PSX material on the avatar at once, so all meshes share one
+  look. Per-material identity (textures, tint, cutoff, emission, alpha masks, transparency
+  mode, culling, render queue) is never touched.
+  - Property groups can be applied selectively: PSX Effects, Color & CRT, Lighting.
+  - The preset is edited through the real material inspector embedded in the window, so the
+    tool can never drift out of sync with the shader's own UI.
+  - "Pull Settings From Avatar Into Preset" seeds the preset from an existing material, and
+    "Create Preset From Current Look" starts from what the avatar already has.
+  - Optional live sync propagates each edit automatically while the window is open.
+  - Optionally covers every PSX material in the output folder, not just those on the avatar.
+  - Applied as a single undoable step, with keywords re-derived on each target.
+
 ## [1.5.0] - 2026-08-09
 
 ### Added
